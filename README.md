@@ -45,7 +45,7 @@ The tests are grouped by project requirement:
 | `tests/test_storage.py` | SQLite persistence: habits, completions, and reminders are saved and loaded. |
 | `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage and handles reminders. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
-| `tests/test_bot.py` | Telegram buttons, quick-add buttons, reminder add/change/delete, reset, and Mini App dashboard link. |
+| `tests/test_bot.py` | Telegram buttons, plain-name add flow, reminder add/change/delete, reset, and Mini App dashboard link. |
 | `tests/test_scheduler.py` | APScheduler reminder jobs and timezone behavior. |
 
 ## CLI
@@ -117,7 +117,8 @@ Streamlit is analytics only. Use Telegram for habit changes:
 /seed
 ```
 
-The bot also has inline buttons for status, listing habits, quick-adding common
-habits, marking habits done, adding/changing/deleting reminders, resetting demo
-data, showing help, and opening the Streamlit analytics dashboard as a Telegram
-Mini App. Reminder times use `APP_TIMEZONE`, defaulting to Europe/Berlin.
+The bot also has inline buttons for status, listing habits, adding any habit by
+typing its name, marking habits done, adding/changing/deleting reminders,
+resetting demo data, showing help, and opening the Streamlit analytics
+dashboard as a Telegram Mini App. Reminder times use `APP_TIMEZONE`, defaulting
+to Europe/Berlin.

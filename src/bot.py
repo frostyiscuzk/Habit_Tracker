@@ -17,6 +17,8 @@ from typing import Final
 from .manager import HabitManager
 from .scheduler import ReminderScheduler, reminder_timezone_name
 
+STATE_ADD_HABIT_NAME: Final = 1
+
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
 CALLBACK_ADD_MENU: Final = "add_menu"
@@ -25,16 +27,8 @@ CALLBACK_HELP: Final = "help"
 CALLBACK_REMINDERS: Final = "reminders"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
-CALLBACK_PREFIX_QUICK_ADD: Final = "quick_add:"
 CALLBACK_PREFIX_REMIND_QUICK: Final = "remind:"
 CALLBACK_PREFIX_DELETE_REMINDER: Final = "delete_reminder:"
-
-QUICK_HABITS: Final = {
-    "water": ("Drink water", "daily", 1),
-    "study": ("Study Python", "daily", 1),
-    "exercise": ("Exercise", "weekly", 3),
-    "plan": ("Plan the week", "weekly", 1),
-}
 
 _bot_lock = threading.Lock()
 _bot_thread: threading.Thread | None = None
@@ -79,14 +73,13 @@ def help_message() -> str:
         [
             "🛠️ Manage habits from Telegram",
             "",
-            "Most actions work with buttons.",
+            "Use the buttons for the normal flow.",
             "",
-            "Optional typed commands:",
-            "/add Read 10 pages | daily | 1",
-            "/add Gym | weekly | 3",
-            "/done 1",
-            "/remind 1 08:30",
-            "/reminders",
+            "Quick flow:",
+            "1. Tap ➕ Add habit",
+            "2. Type the habit name",
+            "3. Use ✅ Mark done",
+            "4. Use ⏰ Reminders",
             "",
             f"Reminder times use {reminder_timezone_name()} time.",
         ]
@@ -145,22 +138,14 @@ def main_menu_keyboard():
     return InlineKeyboardMarkup(rows)
 
 
-def quick_add_keyboard():
-    """Build quick-add buttons so users do not need to type habit commands."""
+def add_cancel_keyboard():
+    """Build the small keyboard shown while entering a habit name."""
 
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
     return InlineKeyboardMarkup(
         [
-            [
-                InlineKeyboardButton("💧 Drink water", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}water"),
-                InlineKeyboardButton("🐍 Study Python", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}study"),
-            ],
-            [
-                InlineKeyboardButton("🏃 Exercise", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}exercise"),
-                InlineKeyboardButton("🗓️ Plan week", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}plan"),
-            ],
-            [InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)],
+            [InlineKeyboardButton("Cancel", callback_data=CALLBACK_STATUS)],
         ]
     )
 
@@ -232,7 +217,11 @@ async def list_habits(update, context) -> None:
 
 
 async def add_habit(update, context) -> None:
-    """Handle /add Name | daily_or_weekly | target_count."""
+    """Handle /add Name | daily_or_weekly | target_count.
+
+    This command remains for CLI-style users, but the main Telegram flow is the
+    Add habit button followed by a plain habit name.
+    """
 
     text = update.message.text.removeprefix("/add").strip()
     try:
@@ -246,6 +235,23 @@ async def add_habit(update, context) -> None:
         f"✨ Created habit #{habit.id}: {habit.name}",
         reply_markup=main_menu_keyboard(),
     )
+
+
+async def receive_habit_name(update, context) -> int:
+    """Create a daily habit from plain text after the Add habit button."""
+
+    name = update.message.text.strip()
+    try:
+        habit = HabitManager().create_habit(name, "daily", 1)
+    except ValueError as exc:
+        await update.message.reply_text(str(exc), reply_markup=add_cancel_keyboard())
+        return STATE_ADD_HABIT_NAME
+
+    await update.message.reply_text(
+        f"✨ Added {habit.name} as a daily habit.",
+        reply_markup=main_menu_keyboard(),
+    )
+    return -1
 
 
 async def done_habit(update, context) -> None:
@@ -357,10 +363,8 @@ async def handle_button(update, context) -> None:
     elif data == CALLBACK_LIST:
         await query.edit_message_text(habit_list_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_ADD_MENU:
-        await query.edit_message_text(
-            "➕ Pick a habit to add quickly:",
-            reply_markup=quick_add_keyboard(),
-        )
+        await query.edit_message_text("➕ Type the new habit name:", reply_markup=add_cancel_keyboard())
+        return STATE_ADD_HABIT_NAME
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_REMINDERS:
@@ -381,14 +385,6 @@ async def handle_button(update, context) -> None:
         manager.complete_habit(habit_id)
         await query.edit_message_text(
             f"✅ Marked complete: {habit.name}",
-            reply_markup=main_menu_keyboard(),
-        )
-    elif data and data.startswith(CALLBACK_PREFIX_QUICK_ADD):
-        preset = data.removeprefix(CALLBACK_PREFIX_QUICK_ADD)
-        name, periodicity, target_count = QUICK_HABITS[preset]
-        habit = manager.create_habit(name, periodicity, target_count)
-        await query.edit_message_text(
-            f"✨ Added {habit.name}.",
             reply_markup=main_menu_keyboard(),
         )
     elif data and data.startswith(CALLBACK_PREFIX_REMIND_QUICK):
@@ -412,9 +408,26 @@ async def handle_button(update, context) -> None:
 def build_application(token: str):
     """Create the Telegram application and register command/button handlers."""
 
-    from telegram.ext import Application, CallbackQueryHandler, CommandHandler
+    from telegram.ext import (
+        Application,
+        CallbackQueryHandler,
+        CommandHandler,
+        ConversationHandler,
+        MessageHandler,
+        filters,
+    )
 
     application = Application.builder().token(token).post_init(setup_reminders).build()
+    add_conversation = ConversationHandler(
+        entry_points=[CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_ADD_MENU}$")],
+        states={
+            STATE_ADD_HABIT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_habit_name)
+            ]
+        },
+        fallbacks=[CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_STATUS}$")],
+    )
+    application.add_handler(add_conversation)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", start))
     application.add_handler(CommandHandler("help", start))

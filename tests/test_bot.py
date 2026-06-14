@@ -14,17 +14,17 @@ from src.bot import (
     CALLBACK_REMINDERS,
     CALLBACK_SEED,
     CALLBACK_STATUS,
-    CALLBACK_PREFIX_QUICK_ADD,
     CALLBACK_PREFIX_DELETE_REMINDER,
     CALLBACK_PREFIX_REMIND_QUICK,
+    STATE_ADD_HABIT_NAME,
     _parse_add_command,
     _parse_habit_id,
     _parse_reminder_callback,
     _parse_remind_command,
     dashboard_url,
+    add_cancel_keyboard,
     habit_list_message,
     main_menu_keyboard,
-    quick_add_keyboard,
     reminder_quick_keyboard,
     reminders_message,
     start_bot_from_env_once,
@@ -86,19 +86,14 @@ def test_main_menu_keyboard_has_dashboard_mini_app(monkeypatch) -> None:
     assert "https://example.up.railway.app" in web_app_urls
 
 
-def test_quick_add_keyboard_has_preset_habits() -> None:
-    """Users should be able to add common habits with buttons."""
+def test_add_cancel_keyboard_supports_plain_name_flow() -> None:
+    """The Add habit flow should ask for a plain habit name."""
 
-    keyboard = quick_add_keyboard()
-    callback_data = [
-        button.callback_data
-        for row in keyboard.inline_keyboard
-        for button in row
-    ]
+    keyboard = add_cancel_keyboard()
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
 
-    assert f"{CALLBACK_PREFIX_QUICK_ADD}water" in callback_data
-    assert f"{CALLBACK_PREFIX_QUICK_ADD}study" in callback_data
-    assert f"{CALLBACK_PREFIX_QUICK_ADD}exercise" in callback_data
+    assert STATE_ADD_HABIT_NAME == 1
+    assert "Cancel" in labels
 
 
 def test_reminder_quick_keyboard_has_habit_buttons(tmp_path) -> None:
