@@ -26,6 +26,7 @@ from src.bot import (
     _parse_habit_id,
     _parse_reminder_callback,
     _parse_remind_command,
+    action_update_message,
     dashboard_url,
     add_cancel_keyboard,
     add_periodicity_keyboard,
@@ -169,6 +170,22 @@ def test_habit_list_message_uses_manager_data(tmp_path) -> None:
 
     assert "Active habits:" in message
     assert "Read" in message
+
+
+def test_action_update_message_confirms_change_and_counts(tmp_path) -> None:
+    """Mutation feedback should clearly say what happened and show new counts."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+    manager.complete_habit(habit.id or 0, completed_on=date.today())
+
+    message = action_update_message("✅ Done saved: Read", manager)
+
+    assert "✅ Done saved: Read" in message
+    assert "┌ Updated" in message
+    assert "│ Done today: 1" in message
+    assert "│ This week: 1" in message
+    assert "└ Active habits: 1" in message
 
 
 def test_streaks_message_uses_manager_analytics(tmp_path) -> None:

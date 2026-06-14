@@ -61,6 +61,20 @@ def status_message(manager: HabitManager | None = None) -> str:
     )
 
 
+def action_update_message(title: str, manager: HabitManager | None = None) -> str:
+    """Build a short confirmation plus the latest key counters."""
+
+    manager = manager or HabitManager()
+    summary = manager.dashboard_summary()
+    return (
+        f"{title}\n\n"
+        "┌ Updated\n"
+        f"│ Done today: {summary['completed_today']}\n"
+        f"│ This week: {summary['completed_this_week']}\n"
+        f"└ Active habits: {summary['active_habits']}"
+    )
+
+
 def habit_list_message(manager: HabitManager | None = None) -> str:
     """Return a readable list of active habits for Telegram."""
 
@@ -289,13 +303,14 @@ async def add_habit(update, context) -> None:
     text = update.message.text.removeprefix("/add").strip()
     try:
         name, periodicity, target_count = _parse_add_command(text)
-        habit = HabitManager().create_habit(name, periodicity, target_count)
+        manager = HabitManager()
+        habit = manager.create_habit(name, periodicity, target_count)
     except ValueError as exc:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
     await update.message.reply_text(
-        f"✨ Created habit #{habit.id}: {habit.name}",
+        action_update_message(f"✨ Added {habit.name}", manager),
         reply_markup=main_menu_keyboard(),
     )
 
@@ -306,7 +321,8 @@ async def receive_habit_name(update, context) -> int:
     name = update.message.text.strip()
     periodicity = context.user_data.get("new_habit_periodicity", "daily")
     try:
-        habit = HabitManager().create_habit(name, periodicity, 1)
+        manager = HabitManager()
+        habit = manager.create_habit(name, periodicity, 1)
     except ValueError as exc:
         await update.message.reply_text(str(exc), reply_markup=add_cancel_keyboard())
         return STATE_ADD_HABIT_NAME
@@ -314,7 +330,7 @@ async def receive_habit_name(update, context) -> int:
     context.user_data.pop("new_habit_periodicity", None)
     icon = "☀️" if periodicity == "daily" else "🗓️"
     await update.message.reply_text(
-        f"✨ Added {icon} {habit.name}",
+        action_update_message(f"✨ Added {icon} {habit.name}", manager),
         reply_markup=main_menu_keyboard(),
     )
     return -1
@@ -332,7 +348,10 @@ async def done_habit(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"✅ Marked complete: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(
+        action_update_message(f"✅ Done saved: {habit.name}", manager),
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def archive_habit(update, context) -> None:
@@ -340,12 +359,16 @@ async def archive_habit(update, context) -> None:
 
     try:
         habit_id = _parse_habit_id(update.message.text, "/archive")
-        habit = HabitManager().archive_habit(habit_id)
+        manager = HabitManager()
+        habit = manager.archive_habit(habit_id)
     except ValueError as exc:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"📦 Archived habit: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(
+        action_update_message(f"📦 Archived: {habit.name}", manager),
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def delete_habit(update, context) -> None:
@@ -360,14 +383,21 @@ async def delete_habit(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"🗑️ Deleted habit: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(
+        action_update_message(f"🗑️ Deleted: {habit.name}", manager),
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def seed_data(update, context) -> None:
     """Handle /seed and reset demo data."""
 
-    HabitManager().seed_demo_data()
-    await update.message.reply_text("🔄 Demo data reset.", reply_markup=main_menu_keyboard())
+    manager = HabitManager()
+    manager.seed_demo_data()
+    await update.message.reply_text(
+        action_update_message("🔄 Demo data reset.", manager),
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def set_reminder(update, context) -> None:
@@ -386,7 +416,7 @@ async def set_reminder(update, context) -> None:
 
     reminders = manager.list_reminders(chat_id=chat_id)
     await update.message.reply_text(
-        f"✅ {habit.name}: {hour:02d}:{minute:02d}\n\n"
+        f"✅ Reminder saved: {habit.name} {hour:02d}:{minute:02d}\n\n"
         f"{reminders_message(manager, reminders)}",
         reply_markup=reminder_quick_keyboard(manager, chat_id=chat_id),
     )
@@ -416,7 +446,7 @@ async def delete_reminder(update, context) -> None:
 
     reminders = manager.list_reminders(chat_id=update.effective_chat.id)
     await update.message.reply_text(
-        f"🗑️ Removed.\n\n{reminders_message(manager, reminders)}",
+        f"🗑️ Reminder removed.\n\n{reminders_message(manager, reminders)}",
         reply_markup=reminder_quick_keyboard(manager, chat_id=update.effective_chat.id),
     )
 
@@ -460,13 +490,16 @@ async def handle_button(update, context) -> None:
         await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
     elif data == CALLBACK_SEED:
         manager.seed_demo_data()
-        await query.edit_message_text("🔄 Demo data reset.", reply_markup=main_menu_keyboard())
+        await query.edit_message_text(
+            action_update_message("🔄 Demo data reset.", manager),
+            reply_markup=main_menu_keyboard(),
+        )
     elif data and data.startswith(CALLBACK_PREFIX_DONE):
         habit_id = int(data.removeprefix(CALLBACK_PREFIX_DONE))
         habit = manager.get_habit(habit_id)
         manager.complete_habit(habit_id)
         await query.edit_message_text(
-            f"✅ Marked complete: {habit.name}",
+            action_update_message(f"✅ Done saved: {habit.name}", manager),
             reply_markup=main_menu_keyboard(),
         )
     elif data and data.startswith(CALLBACK_PREFIX_REMIND_QUICK):
@@ -477,7 +510,7 @@ async def handle_button(update, context) -> None:
         _schedule_one_if_available(context.application, manager, reminder)
         reminders = manager.list_reminders(chat_id=chat_id)
         await query.edit_message_text(
-            f"✅ {habit.name}: {hour:02d}:{minute:02d}\n\n"
+            f"✅ Reminder saved: {habit.name} {hour:02d}:{minute:02d}\n\n"
             f"{reminders_message(manager, reminders)}",
             reply_markup=reminder_quick_keyboard(manager, chat_id=chat_id),
         )
@@ -486,7 +519,7 @@ async def handle_button(update, context) -> None:
         manager.delete_reminder(reminder_id, chat_id=query.message.chat.id)
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
-            f"🗑️ Removed.\n\n{reminders_message(manager, reminders)}",
+            f"🗑️ Reminder removed.\n\n{reminders_message(manager, reminders)}",
             reply_markup=reminder_quick_keyboard(manager, chat_id=query.message.chat.id),
         )
 
