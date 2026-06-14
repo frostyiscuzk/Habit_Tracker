@@ -58,6 +58,7 @@ Location: `src/storage.py`
 
 - SQLite stores habits in the `habits` table.
 - SQLite stores completed dates in the `completions` table.
+- SQLite stores Telegram reminders in the `reminders` table.
 - The default database file is `data/habits.db`.
 
 ## Functional Programming
@@ -94,6 +95,7 @@ The Telegram bot manages habit changes and uses inline keyboard buttons:
 - Status
 - List habits
 - Mark done
+- Reminders
 - Commands
 - Load demo data
 - Open analytics dashboard
@@ -115,6 +117,9 @@ The bot also has text commands for actions that need typed data:
 - `/add Gym | weekly | 3`
 - `/list`
 - `/done 1`
+- `/remind 1 08:30`
+- `/reminders`
+- `/deletereminder 1`
 - `/archive 1`
 - `/delete 1`
 - `/seed`
@@ -136,11 +141,12 @@ The command-line interface supports:
 Location: `tests/`
 
 - `test_habit.py` checks model validation and habit completion logic.
-- `test_storage.py` checks SQLite saving and loading.
-- `test_manager.py` checks the app service layer.
+- `test_storage.py` checks SQLite saving and loading, including reminders.
+- `test_manager.py` checks the app service layer, including reminders.
 - `test_analytics.py` checks streak and completion-rate calculations.
 - `test_bot.py` checks that Telegram inline buttons, command parsing, and the
-  Mini App dashboard link are present.
+  reminder commands, and the Mini App dashboard link are present.
+- `test_scheduler.py` checks that reminder records become APScheduler jobs.
 
 ## Deployment
 

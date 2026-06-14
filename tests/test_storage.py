@@ -8,6 +8,7 @@ create a temporary SQLite database instead of touching the real app database.
 from datetime import date
 
 from src.habit import Habit, Periodicity
+from src.reminder import Reminder
 from src.storage import SQLiteStorage
 
 
@@ -41,3 +42,21 @@ def test_storage_archives_and_filters_habits(tmp_path) -> None:
     # Normal list hides archived habits; include_archived shows them.
     assert storage.list_habits() == []
     assert storage.list_habits(include_archived=True)[0].id == habit.id
+
+
+def test_storage_persists_reminders(tmp_path) -> None:
+    """Reminder settings should be saved in SQLite."""
+
+    storage = SQLiteStorage(tmp_path / "habits.db")
+    habit = storage.add_habit(Habit(name="Read", periodicity="daily"))
+
+    reminder = storage.add_reminder(
+        Reminder(habit_id=habit.id or 0, chat_id=123, hour=8, minute=30)
+    )
+
+    reminders = storage.list_reminders(chat_id=123)
+
+    assert reminder.id is not None
+    assert len(reminders) == 1
+    assert reminders[0].hour == 8
+    assert reminders[0].minute == 30

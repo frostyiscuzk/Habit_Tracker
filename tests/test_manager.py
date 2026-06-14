@@ -36,3 +36,15 @@ def test_manager_archives_habit(tmp_path) -> None:
     # Active habits exclude archived ones, but the data is still available.
     assert manager.list_habits() == []
     assert len(manager.list_habits(include_archived=True)) == 1
+
+
+def test_manager_adds_reminder(tmp_path) -> None:
+    """Manager should validate and store Telegram reminders."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+
+    reminder = manager.add_reminder(habit.id or 0, chat_id=123, hour=8, minute=30)
+
+    assert reminder.id is not None
+    assert manager.list_reminders(chat_id=123)[0].habit_id == habit.id

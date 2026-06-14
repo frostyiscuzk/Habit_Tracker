@@ -10,13 +10,16 @@ from src.bot import (
     CALLBACK_DONE_MENU,
     CALLBACK_HELP,
     CALLBACK_LIST,
+    CALLBACK_REMINDERS,
     CALLBACK_SEED,
     CALLBACK_STATUS,
     _parse_add_command,
     _parse_habit_id,
+    _parse_remind_command,
     dashboard_url,
     habit_list_message,
     main_menu_keyboard,
+    reminders_message,
     start_bot_from_env_once,
 )
 from src.manager import HabitManager
@@ -36,6 +39,7 @@ def test_main_menu_keyboard_has_telegram_buttons() -> None:
     assert CALLBACK_LIST in callback_data
     assert CALLBACK_DONE_MENU in callback_data
     assert CALLBACK_HELP in callback_data
+    assert CALLBACK_REMINDERS in callback_data
     assert CALLBACK_SEED in callback_data
 
 
@@ -53,6 +57,7 @@ def test_main_menu_keyboard_uses_friendly_labels() -> None:
     assert "📋 List habits" in labels
     assert "✅ Mark done" in labels
     assert "🛠️ Commands" in labels
+    assert "⏰ Reminders" in labels
 
 
 def test_main_menu_keyboard_has_dashboard_mini_app(monkeypatch) -> None:
@@ -94,6 +99,25 @@ def test_habit_id_parser_reads_numeric_id() -> None:
     """The bot can parse ids for done/archive/delete commands."""
 
     assert _parse_habit_id("/done 7", "/done") == 7
+
+
+def test_reminder_command_parser_reads_id_and_time() -> None:
+    """The bot can parse reminder command text."""
+
+    assert _parse_remind_command("/remind 7 08:30") == (7, 8, 30)
+
+
+def test_reminders_message_lists_saved_reminders(tmp_path) -> None:
+    """The bot can show saved reminders in a friendly message."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+    reminder = manager.add_reminder(habit.id or 0, chat_id=123, hour=8, minute=30)
+
+    message = reminders_message(manager, [reminder])
+
+    assert "🔔 Active reminders:" in message
+    assert "Read at 08:30" in message
 
 
 def test_bot_does_not_start_without_token(monkeypatch) -> None:

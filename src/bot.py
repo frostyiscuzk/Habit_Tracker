@@ -15,16 +15,19 @@ import threading
 from typing import Final
 
 from .manager import HabitManager
+from .scheduler import ReminderScheduler
 
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
 CALLBACK_DONE_MENU: Final = "done_menu"
 CALLBACK_HELP: Final = "help"
+CALLBACK_REMINDERS: Final = "reminders"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
 
 _bot_lock = threading.Lock()
 _bot_thread: threading.Thread | None = None
+_reminder_scheduler: ReminderScheduler | None = None
 
 
 def status_message(manager: HabitManager | None = None) -> str:
@@ -75,6 +78,9 @@ def help_message() -> str:
             "✅ Mark done: /done 1",
             "📦 Archive: /archive 1",
             "🗑️ Delete: /delete 1",
+            "⏰ Set reminder: /remind 1 08:30",
+            "🔔 List reminders: /reminders",
+            "🧹 Delete reminder: /deletereminder 1",
             "🌱 Demo data: /seed",
             "",
             "📊 Streamlit is only for analytics.",
@@ -111,6 +117,9 @@ def main_menu_keyboard():
         [
             InlineKeyboardButton("✅ Mark done", callback_data=CALLBACK_DONE_MENU),
             InlineKeyboardButton("🛠️ Commands", callback_data=CALLBACK_HELP),
+        ],
+        [
+            InlineKeyboardButton("⏰ Reminders", callback_data=CALLBACK_REMINDERS),
         ],
         [
             InlineKeyboardButton("🌱 Load demo data", callback_data=CALLBACK_SEED),
@@ -227,6 +236,50 @@ async def seed_data(update, context) -> None:
     await update.message.reply_text("🌱 Demo data loaded.", reply_markup=main_menu_keyboard())
 
 
+async def set_reminder(update, context) -> None:
+    """Handle /remind habit_id HH:MM."""
+
+    try:
+        habit_id, hour, minute = _parse_remind_command(update.message.text)
+        chat_id = update.effective_chat.id
+        manager = HabitManager()
+        habit = manager.get_habit(habit_id)
+        reminder = manager.add_reminder(habit_id, chat_id, hour, minute)
+        _schedule_one_if_available(context.application, manager, reminder)
+    except ValueError as exc:
+        await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
+        return
+
+    await update.message.reply_text(
+        f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d}.",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def list_reminders(update, context) -> None:
+    """Handle /reminders."""
+
+    manager = HabitManager()
+    reminders = manager.list_reminders(chat_id=update.effective_chat.id)
+    await update.message.reply_text(
+        reminders_message(manager, reminders),
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def delete_reminder(update, context) -> None:
+    """Handle /deletereminder reminder_id."""
+
+    try:
+        reminder_id = _parse_habit_id(update.message.text, "/deletereminder")
+        HabitManager().delete_reminder(reminder_id, chat_id=update.effective_chat.id)
+    except ValueError as exc:
+        await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
+        return
+
+    await update.message.reply_text("🧹 Reminder deleted.", reply_markup=main_menu_keyboard())
+
+
 async def handle_button(update, context) -> None:
     """Handle all Telegram inline button presses."""
 
@@ -241,6 +294,12 @@ async def handle_button(update, context) -> None:
         await query.edit_message_text(habit_list_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
+    elif data == CALLBACK_REMINDERS:
+        reminders = manager.list_reminders(chat_id=query.message.chat.id)
+        await query.edit_message_text(
+            reminders_message(manager, reminders),
+            reply_markup=main_menu_keyboard(),
+        )
     elif data == CALLBACK_DONE_MENU:
         await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
     elif data == CALLBACK_SEED:
@@ -261,7 +320,7 @@ def build_application(token: str):
 
     from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
-    application = Application.builder().token(token).build()
+    application = Application.builder().token(token).post_init(setup_reminders).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", start))
     application.add_handler(CommandHandler("help", start))
@@ -270,9 +329,44 @@ def build_application(token: str):
     application.add_handler(CommandHandler("done", done_habit))
     application.add_handler(CommandHandler("archive", archive_habit))
     application.add_handler(CommandHandler("delete", delete_habit))
+    application.add_handler(CommandHandler("remind", set_reminder))
+    application.add_handler(CommandHandler("reminders", list_reminders))
+    application.add_handler(CommandHandler("deletereminder", delete_reminder))
     application.add_handler(CommandHandler("seed", seed_data))
     application.add_handler(CallbackQueryHandler(handle_button))
     return application
+
+
+async def setup_reminders(application) -> None:
+    """Start APScheduler and load saved reminders when Telegram starts."""
+
+    global _reminder_scheduler
+    if _reminder_scheduler is None:
+        _reminder_scheduler = ReminderScheduler()
+        _reminder_scheduler.start()
+    _reminder_scheduler.schedule_existing_reminders(
+        application,
+        HabitManager(),
+        asyncio.get_running_loop(),
+    )
+
+
+def reminders_message(manager: HabitManager, reminders) -> str:
+    """Build a friendly reminder list for Telegram."""
+
+    if not reminders:
+        return "🔕 No reminders yet.\n\nSet one with:\n/remind 1 08:30"
+    lines = ["🔔 Active reminders:"]
+    for reminder in reminders:
+        try:
+            habit = manager.get_habit(reminder.habit_id)
+            habit_name = habit.name
+        except ValueError:
+            habit_name = "Deleted habit"
+        lines.append(
+            f"#{reminder.id} {habit_name} at {reminder.hour:02d}:{reminder.minute:02d}"
+        )
+    return "\n".join(lines)
 
 
 def start_bot_from_env_once() -> bool:
@@ -344,6 +438,36 @@ def _parse_habit_id(text: str, command: str) -> int:
         return int(value)
     except ValueError as exc:
         raise ValueError("Habit id must be a number.") from exc
+
+
+def _parse_remind_command(text: str) -> tuple[int, int, int]:
+    """Parse /remind habit_id HH:MM."""
+
+    parts = text.removeprefix("/remind").strip().split()
+    if len(parts) != 2:
+        raise ValueError("Use: /remind habit_id HH:MM")
+    try:
+        habit_id = int(parts[0])
+        hour_text, minute_text = parts[1].split(":", maxsplit=1)
+        hour = int(hour_text)
+        minute = int(minute_text)
+    except ValueError as exc:
+        raise ValueError("Use a numeric habit id and time like 08:30.") from exc
+    return habit_id, hour, minute
+
+
+def _schedule_one_if_available(application, manager: HabitManager, reminder) -> None:
+    """Schedule a newly created reminder if the runtime scheduler is active."""
+
+    if _reminder_scheduler is None:
+        return
+    habit = manager.get_habit(reminder.habit_id)
+    _reminder_scheduler.schedule_reminder(
+        application,
+        reminder,
+        habit.name,
+        asyncio.get_running_loop(),
+    )
 
 
 def main() -> int:

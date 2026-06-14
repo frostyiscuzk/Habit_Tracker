@@ -1,20 +1,23 @@
-"""Optional reminder scheduler for future notifications.
+"""Telegram reminder scheduler.
 
-This module is prepared for reminders. It is separate from the core app so the
-habit tracker works even when reminders are not used.
+This module connects persisted Reminder records to APScheduler jobs. It is kept
+outside the bot handlers so reminders are a separate responsibility.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import datetime
+import asyncio
+from typing import Any
+
+from .manager import HabitManager
+from .reminder import Reminder
 
 
 class ReminderScheduler:
-    """Tiny adapter around APScheduler when reminders are needed."""
+    """Schedules daily Telegram reminder messages with APScheduler."""
 
     def __init__(self) -> None:
-        """Import APScheduler only when reminders are actually created."""
+        """Create a background scheduler only when the bot needs reminders."""
 
         try:
             from apscheduler.schedulers.background import BackgroundScheduler
@@ -25,24 +28,62 @@ class ReminderScheduler:
     def start(self) -> None:
         """Start background reminder jobs."""
 
-        self._scheduler.start()
+        if not self._scheduler.running:
+            self._scheduler.start()
 
     def stop(self) -> None:
         """Stop background reminder jobs."""
 
-        self._scheduler.shutdown(wait=False)
+        if self._scheduler.running:
+            self._scheduler.shutdown(wait=False)
 
-    def add_daily_reminder(
-        self, name: str, hour: int, minute: int, callback: Callable[[], None]
+    def schedule_existing_reminders(
+        self,
+        application: Any,
+        manager: HabitManager,
+        loop: asyncio.AbstractEventLoop,
     ) -> None:
-        """Schedule one daily callback at the requested hour and minute."""
+        """Load reminders from SQLite and schedule each one."""
+
+        for reminder in manager.list_reminders():
+            habit = manager.get_habit(reminder.habit_id)
+            self.schedule_reminder(application, reminder, habit.name, loop)
+
+    def schedule_reminder(
+        self,
+        application: Any,
+        reminder: Reminder,
+        habit_name: str,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        """Schedule or replace one daily Telegram reminder."""
 
         self._scheduler.add_job(
-            callback,
+            lambda: self._send_reminder(application, reminder, habit_name, loop),
             trigger="cron",
-            hour=hour,
-            minute=minute,
-            id=name,
+            hour=reminder.hour,
+            minute=reminder.minute,
+            id=self._job_id(reminder),
             replace_existing=True,
-            next_run_time=datetime.now(),
         )
+
+    @staticmethod
+    def _send_reminder(
+        application: Any,
+        reminder: Reminder,
+        habit_name: str,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        """Send the Telegram message from the scheduler thread."""
+
+        message = f"⏰ Reminder: {habit_name}\n\nUse /done {reminder.habit_id} when finished."
+        asyncio.run_coroutine_threadsafe(
+            application.bot.send_message(chat_id=reminder.chat_id, text=message),
+            loop,
+        )
+
+    @staticmethod
+    def _job_id(reminder: Reminder) -> str:
+        """Build a stable APScheduler job id."""
+
+        return f"reminder-{reminder.id or reminder.chat_id}-{reminder.habit_id}"

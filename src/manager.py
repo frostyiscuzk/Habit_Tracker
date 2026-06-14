@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import analytics
 from .habit import Completion, Habit, Periodicity
+from .reminder import Reminder
 from .storage import SQLiteStorage
 
 
@@ -133,3 +134,27 @@ class HabitManager:
         from .fixtures import demo_completions, demo_habits
 
         self.storage.replace_demo_data(demo_habits(), demo_completions())
+
+    def add_reminder(
+        self, habit_id: int, chat_id: int, hour: int, minute: int
+    ) -> Reminder:
+        """Create or update a daily Telegram reminder for a habit."""
+
+        self.get_habit(habit_id)
+        if not 0 <= hour <= 23:
+            raise ValueError("Reminder hour must be between 00 and 23.")
+        if not 0 <= minute <= 59:
+            raise ValueError("Reminder minute must be between 00 and 59.")
+        return self.storage.add_reminder(
+            Reminder(habit_id=habit_id, chat_id=chat_id, hour=hour, minute=minute)
+        )
+
+    def list_reminders(self, chat_id: int | None = None) -> list[Reminder]:
+        """List active reminder settings."""
+
+        return self.storage.list_reminders(chat_id=chat_id)
+
+    def delete_reminder(self, reminder_id: int, chat_id: int | None = None) -> None:
+        """Delete one reminder."""
+
+        self.storage.delete_reminder(reminder_id, chat_id=chat_id)

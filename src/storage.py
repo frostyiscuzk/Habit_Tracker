@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .habit import Completion, Habit, Periodicity
+from .reminder import Reminder
 
 
 DEFAULT_DATABASE_PATH = Path("data/habits.db")
@@ -38,7 +39,7 @@ class SQLiteStorage:
         self.initialize()
 
     def initialize(self) -> None:
-        """Create the two database tables used by the app."""
+        """Create the database tables used by the app."""
 
         with self._connection:
             # The habits table stores the habit settings shown in the UI.
@@ -52,6 +53,21 @@ class SQLiteStorage:
                     target_count INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
                     archived INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            # The reminders table stores Telegram reminder settings.
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    habit_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    hour INTEGER NOT NULL,
+                    minute INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(habit_id, chat_id),
+                    FOREIGN KEY(habit_id) REFERENCES habits(id) ON DELETE CASCADE
                 )
                 """
             )
@@ -125,6 +141,7 @@ class SQLiteStorage:
 
         with self._connection:
             self._connection.execute("DELETE FROM completions WHERE habit_id = ?", (habit_id,))
+            self._connection.execute("DELETE FROM reminders WHERE habit_id = ?", (habit_id,))
             self._connection.execute("DELETE FROM habits WHERE id = ?", (habit_id,))
 
     def get_habit(self, habit_id: int) -> Habit | None:
@@ -228,6 +245,80 @@ class SQLiteStorage:
             new_habit_id = id_map.get(completion.habit_id, completion.habit_id)
             self.add_completion(new_habit_id, completion.completed_on, completion.note)
 
+    def add_reminder(self, reminder: Reminder) -> Reminder:
+        """Insert or update a Telegram reminder for a habit and chat."""
+
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO reminders (habit_id, chat_id, hour, minute, enabled)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(habit_id, chat_id)
+                DO UPDATE SET hour = excluded.hour,
+                              minute = excluded.minute,
+                              enabled = excluded.enabled
+                """,
+                (
+                    reminder.habit_id,
+                    reminder.chat_id,
+                    reminder.hour,
+                    reminder.minute,
+                    int(reminder.enabled),
+                ),
+            )
+        reminder_id = self._find_reminder_id(reminder.habit_id, reminder.chat_id)
+        return Reminder(
+            id=int(reminder_id),
+            habit_id=reminder.habit_id,
+            chat_id=reminder.chat_id,
+            hour=reminder.hour,
+            minute=reminder.minute,
+            enabled=reminder.enabled,
+        )
+
+    def list_reminders(self, chat_id: int | None = None) -> list[Reminder]:
+        """Return reminder settings, optionally for one Telegram chat."""
+
+        if chat_id is None:
+            rows = self._connection.execute(
+                "SELECT * FROM reminders WHERE enabled = 1 ORDER BY hour, minute"
+            ).fetchall()
+        else:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM reminders
+                WHERE enabled = 1 AND chat_id = ?
+                ORDER BY hour, minute
+                """,
+                (chat_id,),
+            ).fetchall()
+        return [self._row_to_reminder(row) for row in rows]
+
+    def delete_reminder(self, reminder_id: int, chat_id: int | None = None) -> None:
+        """Delete one reminder by id, optionally scoped to one chat."""
+
+        with self._connection:
+            if chat_id is None:
+                self._connection.execute(
+                    "DELETE FROM reminders WHERE id = ?", (reminder_id,)
+                )
+            else:
+                self._connection.execute(
+                    "DELETE FROM reminders WHERE id = ? AND chat_id = ?",
+                    (reminder_id, chat_id),
+                )
+
+    def _find_reminder_id(self, habit_id: int, chat_id: int) -> int:
+        """Find the database id for an upserted reminder."""
+
+        row = self._connection.execute(
+            "SELECT id FROM reminders WHERE habit_id = ? AND chat_id = ?",
+            (habit_id, chat_id),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Reminder was not saved.")
+        return int(row["id"])
+
     @staticmethod
     def _row_to_habit(row: sqlite3.Row) -> Habit:
         """Convert one SQLite row into a Habit object."""
@@ -251,4 +342,17 @@ class SQLiteStorage:
             habit_id=int(row["habit_id"]),
             completed_on=date.fromisoformat(str(row["completed_on"])),
             note=str(row["note"]),
+        )
+
+    @staticmethod
+    def _row_to_reminder(row: sqlite3.Row) -> Reminder:
+        """Convert one SQLite row into a Reminder object."""
+
+        return Reminder(
+            id=int(row["id"]),
+            habit_id=int(row["habit_id"]),
+            chat_id=int(row["chat_id"]),
+            hour=int(row["hour"]),
+            minute=int(row["minute"]),
+            enabled=bool(row["enabled"]),
         )

@@ -16,8 +16,8 @@ Live Telegram bot:
 Recommended live test order:
 
 1. Open the Telegram bot and send `/start`.
-2. Press the bot buttons: 📊 Status, 📋 List habits, ✅ Mark done, 🛠️ Commands,
-   🌱 Load demo data, 📈 Open analytics dashboard.
+2. Press the bot buttons: 📊 Status, 📋 List habits, ✅ Mark done, ⏰ Reminders,
+   🛠️ Commands, 🌱 Load demo data, 📈 Open analytics dashboard.
 3. Press 📈 Open analytics dashboard inside Telegram. This opens the Streamlit
    dashboard as a Telegram Mini App.
 4. Open the Railway dashboard link in a browser and check the same read-only
@@ -58,16 +58,17 @@ python -m pytest
 Expected result:
 
 ```text
-17 passed
+22 passed
 ```
 
 What the tests cover:
 
 - `tests/test_habit.py`: OOP, inheritance, validation, daily/weekly logic.
-- `tests/test_storage.py`: SQLite persistence.
-- `tests/test_manager.py`: composition/service layer.
+- `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
+- `tests/test_manager.py`: composition/service layer, including reminders.
 - `tests/test_analytics.py`: pure analytics functions.
-- `tests/test_bot.py`: Telegram buttons, commands, and Mini App dashboard link.
+- `tests/test_bot.py`: Telegram buttons, commands, reminders, and Mini App link.
+- `tests/test_scheduler.py`: APScheduler jobs are created for reminders.
 
 ### 3. Test The Already-Running Telegram Bot
 
@@ -82,6 +83,8 @@ Try:
 /list
 /add Read 10 pages | daily | 1
 /done 1
+/remind 1 08:30
+/reminders
 /archive 1
 ```
 
@@ -90,6 +93,7 @@ Also test the buttons:
 - 📊 Status
 - 📋 List habits
 - ✅ Mark done
+- ⏰ Reminders
 - 🛠️ Commands
 - 🌱 Load demo data
 - 📈 Open analytics dashboard
@@ -135,9 +139,10 @@ controls. Habit changes are done through Telegram or CLI.
 | Composition | `src/manager.py`, `src/dashboard.py` |
 | Encapsulation | `src/manager.py`, `src/storage.py` |
 | SQLite persistence | `src/storage.py` |
+| Reminder scheduler | `src/reminder.py`, `src/scheduler.py` |
 | Pure analytics functions | `src/analytics.py` |
 | Streamlit analytics UI | `src/dashboard.py`, `app.py` |
-| Telegram bot and Mini App button | `src/bot.py` |
+| Telegram bot, reminders, and Mini App button | `src/bot.py` |
 | Railway single-service launcher | `src/railway.py`, `Procfile`, `railway.json` |
 | Tests | `tests/` |
 

@@ -10,5 +10,5 @@ streamlit
 # Optional dependency for a future Telegram bot interface.
 python-telegram-bot
 
-# Optional dependency for future habit reminder scheduling.
+# Runs daily Telegram habit reminders.
 APScheduler
