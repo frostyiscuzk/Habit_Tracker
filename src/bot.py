@@ -17,7 +17,8 @@ from typing import Final
 from .manager import HabitManager
 from .scheduler import ReminderScheduler, reminder_timezone_name
 
-STATE_ADD_HABIT_NAME: Final = 1
+STATE_ADD_HABIT_PERIODICITY: Final = 1
+STATE_ADD_HABIT_NAME: Final = 2
 
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
@@ -28,6 +29,7 @@ CALLBACK_REMINDERS: Final = "reminders"
 CALLBACK_STREAKS: Final = "streaks"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
+CALLBACK_PREFIX_ADD_PERIODICITY: Final = "add_periodicity:"
 CALLBACK_PREFIX_REMIND_QUICK: Final = "remind:"
 CALLBACK_PREFIX_DELETE_REMINDER: Final = "delete_reminder:"
 
@@ -82,13 +84,12 @@ def streaks_message(manager: HabitManager | None = None) -> str:
     manager = manager or HabitManager()
     leaderboard = manager.dashboard_summary()["leaderboard"]
     if not leaderboard:
-        return "🔥 No streak data yet.\n\nMark a habit done to start a streak."
+        return "🔥 Streaks\n\nNone yet."
 
-    lines = ["🔥 Habit streaks:"]
-    for row in leaderboard:
+    lines = ["🔥 Streaks"]
+    for row in leaderboard[:5]:
         lines.append(
-            f"• {row['habit']}: {row['current_streak']} current, "
-            f"{row['longest_streak']} longest, {row['count']} completions"
+            f"{row['habit']}: {row['current_streak']} now | {row['longest_streak']} best"
         )
     return "\n".join(lines)
 
@@ -104,10 +105,11 @@ def help_message() -> str:
             "",
             "Quick flow:",
             "1. Tap ➕ Add habit",
-            "2. Type the habit name",
-            "3. Use ✅ Mark done",
-            "4. Use 🔥 Streaks to check progress",
-            "5. Use ⏰ Reminders",
+            "2. Pick ☀️ Daily or 🗓️ Weekly",
+            "3. Type the habit name",
+            "4. Use ✅ Mark done",
+            "5. Use 🔥 Streaks",
+            "6. Use ⏰ Reminders",
             "",
             f"Reminder times use {reminder_timezone_name()} time.",
         ]
@@ -175,6 +177,28 @@ def add_cancel_keyboard():
     return InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("Cancel", callback_data=CALLBACK_STATUS)],
+        ]
+    )
+
+
+def add_periodicity_keyboard():
+    """Build the Daily/Weekly choice shown before entering a habit name."""
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "☀️ Daily",
+                    callback_data=f"{CALLBACK_PREFIX_ADD_PERIODICITY}daily",
+                ),
+                InlineKeyboardButton(
+                    "🗓️ Weekly",
+                    callback_data=f"{CALLBACK_PREFIX_ADD_PERIODICITY}weekly",
+                ),
+            ],
+            [InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)],
         ]
     )
 
@@ -254,8 +278,8 @@ async def list_streaks(update, context) -> None:
 async def add_habit(update, context) -> None:
     """Handle /add Name | daily_or_weekly | target_count.
 
-    This command remains for CLI-style users, but the main Telegram flow is the
-    Add habit button followed by a plain habit name.
+    This command remains for CLI-style users, but the main Telegram flow uses
+    buttons for daily/weekly and then asks for a plain habit name.
     """
 
     text = update.message.text.removeprefix("/add").strip()
@@ -273,17 +297,20 @@ async def add_habit(update, context) -> None:
 
 
 async def receive_habit_name(update, context) -> int:
-    """Create a daily habit from plain text after the Add habit button."""
+    """Create a habit from plain text after the Daily/Weekly button choice."""
 
     name = update.message.text.strip()
+    periodicity = context.user_data.get("new_habit_periodicity", "daily")
     try:
-        habit = HabitManager().create_habit(name, "daily", 1)
+        habit = HabitManager().create_habit(name, periodicity, 1)
     except ValueError as exc:
         await update.message.reply_text(str(exc), reply_markup=add_cancel_keyboard())
         return STATE_ADD_HABIT_NAME
 
+    context.user_data.pop("new_habit_periodicity", None)
+    icon = "☀️" if periodicity == "daily" else "🗓️"
     await update.message.reply_text(
-        f"✨ Added {habit.name} as a daily habit.",
+        f"✨ Added {icon} {habit.name}",
         reply_markup=main_menu_keyboard(),
     )
     return -1
@@ -395,13 +422,23 @@ async def handle_button(update, context) -> None:
 
     if data == CALLBACK_STATUS:
         await query.edit_message_text(status_message(manager), reply_markup=main_menu_keyboard())
+        return -1
     elif data == CALLBACK_LIST:
         await query.edit_message_text(habit_list_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_ADD_MENU:
-        await query.edit_message_text("➕ Type the new habit name:", reply_markup=add_cancel_keyboard())
-        return STATE_ADD_HABIT_NAME
+        await query.edit_message_text("➕ New habit type:", reply_markup=add_periodicity_keyboard())
+        return STATE_ADD_HABIT_PERIODICITY
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
+    elif data and data.startswith(CALLBACK_PREFIX_ADD_PERIODICITY):
+        periodicity = data.removeprefix(CALLBACK_PREFIX_ADD_PERIODICITY)
+        if periodicity not in {"daily", "weekly"}:
+            await query.edit_message_text("Choose daily or weekly.", reply_markup=add_periodicity_keyboard())
+            return STATE_ADD_HABIT_PERIODICITY
+        context.user_data["new_habit_periodicity"] = periodicity
+        icon = "☀️" if periodicity == "daily" else "🗓️"
+        await query.edit_message_text(f"{icon} Habit name?", reply_markup=add_cancel_keyboard())
+        return STATE_ADD_HABIT_NAME
     elif data == CALLBACK_STREAKS:
         await query.edit_message_text(streaks_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_REMINDERS:
@@ -458,6 +495,12 @@ def build_application(token: str):
     add_conversation = ConversationHandler(
         entry_points=[CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_ADD_MENU}$")],
         states={
+            STATE_ADD_HABIT_PERIODICITY: [
+                CallbackQueryHandler(
+                    handle_button,
+                    pattern=f"^{CALLBACK_PREFIX_ADD_PERIODICITY}",
+                )
+            ],
             STATE_ADD_HABIT_NAME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_habit_name)
             ]

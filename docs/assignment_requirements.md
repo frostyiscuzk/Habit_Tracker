@@ -113,6 +113,10 @@ It creates `InlineKeyboardButton` objects and returns an
 The dashboard button uses Telegram's `WebAppInfo` to open Streamlit as a Mini
 App.
 
+The Add habit button first asks the user to choose `Daily` or `Weekly`, then it
+asks for the habit name. This keeps the normal Telegram flow button-based while
+still supporting both required periodicities.
+
 The bot also has text commands for actions that need typed data:
 
 - `/add Read 10 pages | daily | 1`
@@ -147,8 +151,9 @@ Location: `tests/`
 - `test_storage.py` checks SQLite saving and loading, including reminders.
 - `test_manager.py` checks the app service layer, including reminders.
 - `test_analytics.py` checks streak and completion-rate calculations.
-- `test_bot.py` checks Telegram inline buttons, command parsing, streak display,
-  reminder add/change/delete controls, reset, and the Mini App dashboard link.
+- `test_bot.py` checks Telegram inline buttons, daily/weekly add controls,
+  command parsing, compact streak display, reminder add/change/delete controls,
+  reset, and the Mini App dashboard link.
 - `test_scheduler.py` checks reminder records become APScheduler jobs and use
   the configured timezone.
 

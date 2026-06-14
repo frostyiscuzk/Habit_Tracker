@@ -17,8 +17,10 @@ from src.bot import (
     CALLBACK_SEED,
     CALLBACK_STATUS,
     CALLBACK_STREAKS,
+    CALLBACK_PREFIX_ADD_PERIODICITY,
     CALLBACK_PREFIX_DELETE_REMINDER,
     CALLBACK_PREFIX_REMIND_QUICK,
+    STATE_ADD_HABIT_PERIODICITY,
     STATE_ADD_HABIT_NAME,
     _parse_add_command,
     _parse_habit_id,
@@ -26,6 +28,7 @@ from src.bot import (
     _parse_remind_command,
     dashboard_url,
     add_cancel_keyboard,
+    add_periodicity_keyboard,
     habit_list_message,
     main_menu_keyboard,
     reminder_quick_keyboard,
@@ -98,8 +101,26 @@ def test_add_cancel_keyboard_supports_plain_name_flow() -> None:
     keyboard = add_cancel_keyboard()
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
 
-    assert STATE_ADD_HABIT_NAME == 1
+    assert STATE_ADD_HABIT_NAME == 2
     assert "Cancel" in labels
+
+
+def test_add_periodicity_keyboard_supports_daily_and_weekly() -> None:
+    """The Add habit flow should let users choose daily or weekly."""
+
+    keyboard = add_periodicity_keyboard()
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert STATE_ADD_HABIT_PERIODICITY == 1
+    assert "☀️ Daily" in labels
+    assert "🗓️ Weekly" in labels
+    assert f"{CALLBACK_PREFIX_ADD_PERIODICITY}daily" in callback_data
+    assert f"{CALLBACK_PREFIX_ADD_PERIODICITY}weekly" in callback_data
 
 
 def test_reminder_quick_keyboard_has_habit_buttons(tmp_path) -> None:
@@ -158,10 +179,11 @@ def test_streaks_message_uses_manager_analytics(tmp_path) -> None:
 
     message = streaks_message(manager)
 
-    assert "🔥 Habit streaks:" in message
+    assert "🔥 Streaks" in message
     assert "Read" in message
-    assert "2 current" in message
-    assert "2 longest" in message
+    assert "2 now" in message
+    assert "2 best" in message
+    assert "completions" not in message
 
 
 def test_add_command_parser_accepts_name_periodicity_and_target() -> None:

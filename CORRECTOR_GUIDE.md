@@ -60,7 +60,7 @@ python -m pytest
 Expected result:
 
 ```text
-29 passed
+30 passed
 ```
 
 What the tests cover:
@@ -69,8 +69,8 @@ What the tests cover:
 - `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
 - `tests/test_manager.py`: composition/service layer, including reminders.
 - `tests/test_analytics.py`: pure analytics functions, including streaks.
-- `tests/test_bot.py`: Telegram buttons, plain-name add flow, streak display,
-  reminder add/change/delete, reset, and Mini App link.
+- `tests/test_bot.py`: Telegram buttons, daily/weekly add flow, compact streak
+  display, reminder add/change/delete, reset, and Mini App link.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
 
 ### 3. Test The Already-Running Telegram Bot
@@ -108,8 +108,9 @@ Also test the buttons:
 Add habit behavior:
 
 - Tap ➕ Add habit.
+- Pick ☀️ Daily or 🗓️ Weekly.
 - Type any habit name, for example `Read 10 pages`.
-- The bot creates it as a daily habit.
+- The bot creates it with the chosen periodicity.
 - Advanced typed command still works if needed:
   `/add Gym | weekly | 3`
 
