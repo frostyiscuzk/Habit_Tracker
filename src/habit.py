@@ -1,38 +1,117 @@
-from abc import ABC, abstractmethod
+"""Domain models for the habit tracker.
+
+This file contains the main OOP classes. They describe what a habit and a
+completion are before any database or user interface code is involved.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import date, datetime
+from enum import StrEnum
+from typing import Iterable
+
+
+class Periodicity(StrEnum):
+    """Allowed schedules for a habit.
+
+    A StrEnum keeps the values readable in the database and UI while still
+    giving the code a controlled set of choices.
+    """
+
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
+@dataclass(frozen=True)
+class Completion:
+    """A single time when the user marked a habit as done."""
+
+    habit_id: int
+    completed_on: date
+    note: str = ""
+    id: int | None = None
 
 
 @dataclass
-class Habit(ABC):
-    habit_id: int
+class Habit:
+    """A habit the user wants to track.
+
+    This class stores the habit settings and also knows how to check whether
+    the habit is complete for a selected day or week.
+
+    Assignment concept: base class. DailyHabit and WeeklyHabit inherit from
+    this class to reuse common habit behavior.
+    """
+
     name: str
-    periodicity: str
+    periodicity: Periodicity | str
+    target_count: int = 1
+    description: str = ""
     created_at: datetime = field(default_factory=datetime.now)
-    completion_dates: list[date] = field(default_factory=list)
-    
-    def mark_completed(self, when: Optional[date] = None) -> None:
-        if when is None:
-            when = date.today()
-            
-        if when not in self.completion_dates:
-            self.completion_dates.append(when)
-        
-    
-    def current_streak(self) -> int:
-        if not self.completion_dates:
-            return 0
-        dates_set = set(self.completion_dates)
-        streak = 0
-        check_date = date.today()
-        while check_date in dates_set:
-            streak = streak + 1 
-            check_date = check_date - timedelta(days=1)
-            
-        return streak
-    
-    @abstractmethod
-    def is_due(self, today: Optional[date] = None) -> bool:
-        pass
-    
+    id: int | None = None
+    archived: bool = False
+
+    def __post_init__(self) -> None:
+        """Clean and validate habit data after the object is created."""
+
+        self.name = self.name.strip()
+        self.description = self.description.strip()
+        if isinstance(self.periodicity, str):
+            self.periodicity = Periodicity(self.periodicity.lower())
+        if not self.name:
+            raise ValueError("Habit name cannot be empty.")
+        if self.target_count < 1:
+            raise ValueError("Target count must be at least 1.")
+
+    @property
+    def is_daily(self) -> bool:
+        """Small helper used by analytics and UI code."""
+
+        return self.periodicity == Periodicity.DAILY
+
+    @property
+    def is_weekly(self) -> bool:
+        """Small helper used by analytics and UI code."""
+
+        return self.periodicity == Periodicity.WEEKLY
+
+    def is_complete_for(self, completions: Iterable[Completion], day: date) -> bool:
+        """Return whether this habit met its target for the relevant period.
+
+        Daily habits count completions on the exact date. Weekly habits count
+        all completions in the ISO week that contains the selected date.
+        """
+
+        count = 0
+        if self.is_daily:
+            count = sum(1 for completion in completions if completion.completed_on == day)
+        else:
+            # ISO week avoids mistakes at month boundaries.
+            year, week, _ = day.isocalendar()
+            count = sum(
+                1
+                for completion in completions
+                if completion.completed_on.isocalendar()[:2] == (year, week)
+            )
+        return count >= self.target_count
+
+
+class DailyHabit(Habit):
+    """Convenience subclass for creating a daily habit.
+
+    Assignment concept: inheritance from Habit.
+    """
+
+    def __init__(self, name: str, **kwargs: object) -> None:
+        super().__init__(name=name, periodicity=Periodicity.DAILY, **kwargs)
+
+
+class WeeklyHabit(Habit):
+    """Convenience subclass for creating a weekly habit.
+
+    Assignment concept: inheritance from Habit.
+    """
+
+    def __init__(self, name: str, **kwargs: object) -> None:
+        super().__init__(name=name, periodicity=Periodicity.WEEKLY, **kwargs)
