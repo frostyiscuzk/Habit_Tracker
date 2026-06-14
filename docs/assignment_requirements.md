@@ -145,9 +145,10 @@ Location: `tests/`
 - `test_storage.py` checks SQLite saving and loading, including reminders.
 - `test_manager.py` checks the app service layer, including reminders.
 - `test_analytics.py` checks streak and completion-rate calculations.
-- `test_bot.py` checks that Telegram inline buttons, command parsing, and the
-  reminder commands, and the Mini App dashboard link are present.
-- `test_scheduler.py` checks that reminder records become APScheduler jobs.
+- `test_bot.py` checks Telegram inline buttons, command parsing, reminder
+  add/change/delete controls, reset, and the Mini App dashboard link.
+- `test_scheduler.py` checks reminder records become APScheduler jobs and use
+  the configured timezone.
 
 ## Deployment
 

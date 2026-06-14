@@ -7,10 +7,20 @@ outside the bot handlers so reminders are a separate responsibility.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .manager import HabitManager
 from .reminder import Reminder
+
+DEFAULT_REMINDER_TIMEZONE = "Europe/Berlin"
+
+
+def reminder_timezone_name() -> str:
+    """Return the timezone used for Telegram reminders."""
+
+    return os.getenv("APP_TIMEZONE", DEFAULT_REMINDER_TIMEZONE)
 
 
 class ReminderScheduler:
@@ -23,7 +33,7 @@ class ReminderScheduler:
             from apscheduler.schedulers.background import BackgroundScheduler
         except ImportError as exc:
             raise RuntimeError("Install APScheduler to use reminders.") from exc
-        self._scheduler = BackgroundScheduler()
+        self._scheduler = BackgroundScheduler(timezone=ZoneInfo(reminder_timezone_name()))
 
     def start(self) -> None:
         """Start background reminder jobs."""

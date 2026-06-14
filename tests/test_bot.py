@@ -15,9 +15,11 @@ from src.bot import (
     CALLBACK_SEED,
     CALLBACK_STATUS,
     CALLBACK_PREFIX_QUICK_ADD,
-    CALLBACK_PREFIX_REMIND_MORNING,
+    CALLBACK_PREFIX_DELETE_REMINDER,
+    CALLBACK_PREFIX_REMIND_QUICK,
     _parse_add_command,
     _parse_habit_id,
+    _parse_reminder_callback,
     _parse_remind_command,
     dashboard_url,
     habit_list_message,
@@ -100,7 +102,7 @@ def test_quick_add_keyboard_has_preset_habits() -> None:
 
 
 def test_reminder_quick_keyboard_has_habit_buttons(tmp_path) -> None:
-    """Users should be able to set a common reminder without typing."""
+    """Users should be able to set common reminders without typing."""
 
     manager = HabitManager(database_path=tmp_path / "habits.db")
     habit = manager.create_habit("Read", "daily")
@@ -112,7 +114,25 @@ def test_reminder_quick_keyboard_has_habit_buttons(tmp_path) -> None:
         for button in row
     ]
 
-    assert f"{CALLBACK_PREFIX_REMIND_MORNING}{habit.id}" in callback_data
+    assert f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:08:30" in callback_data
+    assert f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:20:00" in callback_data
+
+
+def test_reminder_quick_keyboard_has_delete_buttons(tmp_path) -> None:
+    """Users should be able to delete reminders without typing."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+    reminder = manager.add_reminder(habit.id or 0, chat_id=123, hour=8, minute=30)
+
+    keyboard = reminder_quick_keyboard(manager, chat_id=123)
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert f"{CALLBACK_PREFIX_DELETE_REMINDER}{reminder.id}" in callback_data
 
 
 def test_habit_list_message_uses_manager_data(tmp_path) -> None:
@@ -146,6 +166,12 @@ def test_reminder_command_parser_reads_id_and_time() -> None:
     assert _parse_remind_command("/remind 7 08:30") == (7, 8, 30)
 
 
+def test_reminder_callback_parser_reads_id_and_time() -> None:
+    """The bot can parse reminder button callback data."""
+
+    assert _parse_reminder_callback("remind:7:20:00") == (7, 20, 0)
+
+
 def test_reminders_message_lists_saved_reminders(tmp_path) -> None:
     """The bot can show saved reminders in a friendly message."""
 
@@ -155,7 +181,7 @@ def test_reminders_message_lists_saved_reminders(tmp_path) -> None:
 
     message = reminders_message(manager, [reminder])
 
-    assert "🔔 Active reminders:" in message
+    assert "🔔 Active reminders (Europe/Berlin time):" in message
     assert "Read at 08:30" in message
 
 

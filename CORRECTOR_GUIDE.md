@@ -58,7 +58,7 @@ python -m pytest
 Expected result:
 
 ```text
-25 passed
+28 passed
 ```
 
 What the tests cover:
@@ -67,9 +67,9 @@ What the tests cover:
 - `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
 - `tests/test_manager.py`: composition/service layer, including reminders.
 - `tests/test_analytics.py`: pure analytics functions.
-- `tests/test_bot.py`: Telegram buttons, quick-add buttons, reminders, reset,
-  and Mini App link.
-- `tests/test_scheduler.py`: APScheduler jobs are created for reminders.
+- `tests/test_bot.py`: Telegram buttons, quick-add buttons, reminder add/change/delete,
+  reset, and Mini App link.
+- `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
 
 ### 3. Test The Already-Running Telegram Bot
 
@@ -86,6 +86,7 @@ Try:
 /done 1
 /remind 1 08:30
 /reminders
+/deletereminder 1
 /archive 1
 ```
 
@@ -99,6 +100,15 @@ Also test the buttons:
 - ➕ Add habit
 - 🔄 Reset demo
 - 📈 Open analytics dashboard
+
+Reminder behavior:
+
+- Tap ⏰ Reminders to see saved reminders.
+- Tap a habit/time button such as 🌅 Read 08:30 or 🌙 Read 20:00 to add a reminder.
+- Tapping a different time for the same habit changes that reminder.
+- Tap 🧹 Delete reminder #... to remove a reminder.
+- Reminder times use the app timezone, currently Europe/Berlin unless `APP_TIMEZONE`
+  is changed on Railway.
 
 The last button opens the Streamlit dashboard as a Telegram Mini App.
 

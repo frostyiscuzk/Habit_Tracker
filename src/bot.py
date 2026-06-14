@@ -15,7 +15,7 @@ import threading
 from typing import Final
 
 from .manager import HabitManager
-from .scheduler import ReminderScheduler
+from .scheduler import ReminderScheduler, reminder_timezone_name
 
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
@@ -26,7 +26,8 @@ CALLBACK_REMINDERS: Final = "reminders"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
 CALLBACK_PREFIX_QUICK_ADD: Final = "quick_add:"
-CALLBACK_PREFIX_REMIND_MORNING: Final = "remind_morning:"
+CALLBACK_PREFIX_REMIND_QUICK: Final = "remind:"
+CALLBACK_PREFIX_DELETE_REMINDER: Final = "delete_reminder:"
 
 QUICK_HABITS: Final = {
     "water": ("Drink water", "daily", 1),
@@ -86,6 +87,8 @@ def help_message() -> str:
             "/done 1",
             "/remind 1 08:30",
             "/reminders",
+            "",
+            f"Reminder times use {reminder_timezone_name()} time.",
         ]
     )
 
@@ -177,22 +180,38 @@ def habit_done_keyboard(manager: HabitManager | None = None):
     return InlineKeyboardMarkup(rows)
 
 
-def reminder_quick_keyboard(manager: HabitManager | None = None):
-    """Build quick reminder buttons for active habits at 08:30."""
+def reminder_quick_keyboard(manager: HabitManager | None = None, chat_id: int | None = None):
+    """Build quick reminder and delete buttons."""
 
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
     manager = manager or HabitManager()
-    rows = [
-        [
-            InlineKeyboardButton(
-                f"⏰ {habit.name} at 08:30",
-                callback_data=f"{CALLBACK_PREFIX_REMIND_MORNING}{habit.id}",
+    rows = []
+    for habit in manager.list_habits():
+        if habit.id is None:
+            continue
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    f"🌅 {habit.name} 08:30",
+                    callback_data=f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:08:30",
+                ),
+                InlineKeyboardButton(
+                    f"🌙 {habit.name} 20:00",
+                    callback_data=f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:20:00",
+                ),
+            ]
+        )
+    if chat_id is not None:
+        for reminder in manager.list_reminders(chat_id=chat_id):
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"🧹 Delete reminder #{reminder.id}",
+                        callback_data=f"{CALLBACK_PREFIX_DELETE_REMINDER}{reminder.id}",
+                    )
+                ]
             )
-        ]
-        for habit in manager.list_habits()
-        if habit.id is not None
-    ]
     rows.append([InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)])
     return InlineKeyboardMarkup(rows)
 
@@ -294,7 +313,9 @@ async def set_reminder(update, context) -> None:
         return
 
     await update.message.reply_text(
-        f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d}.",
+        f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d} "
+        f"({reminder_timezone_name()} time).\n\n"
+        "To change it, set another reminder for the same habit.",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -345,8 +366,9 @@ async def handle_button(update, context) -> None:
     elif data == CALLBACK_REMINDERS:
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
-            f"{reminders_message(manager, reminders)}\n\nTap a habit below to set an 08:30 reminder:",
-            reply_markup=reminder_quick_keyboard(manager),
+            f"{reminders_message(manager, reminders)}\n\n"
+            "Tap a habit/time to add or change a reminder:",
+            reply_markup=reminder_quick_keyboard(manager, chat_id=query.message.chat.id),
         )
     elif data == CALLBACK_DONE_MENU:
         await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
@@ -369,16 +391,22 @@ async def handle_button(update, context) -> None:
             f"✨ Added {habit.name}.",
             reply_markup=main_menu_keyboard(),
         )
-    elif data and data.startswith(CALLBACK_PREFIX_REMIND_MORNING):
-        habit_id = int(data.removeprefix(CALLBACK_PREFIX_REMIND_MORNING))
+    elif data and data.startswith(CALLBACK_PREFIX_REMIND_QUICK):
+        habit_id, hour, minute = _parse_reminder_callback(data)
         chat_id = query.message.chat.id
         habit = manager.get_habit(habit_id)
-        reminder = manager.add_reminder(habit_id, chat_id, 8, 30)
+        reminder = manager.add_reminder(habit_id, chat_id, hour, minute)
         _schedule_one_if_available(context.application, manager, reminder)
         await query.edit_message_text(
-            f"⏰ Reminder set for {habit.name} at 08:30.",
+            f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d} "
+            f"({reminder_timezone_name()} time).\n\n"
+            "Setting another time for the same habit changes it.",
             reply_markup=main_menu_keyboard(),
         )
+    elif data and data.startswith(CALLBACK_PREFIX_DELETE_REMINDER):
+        reminder_id = int(data.removeprefix(CALLBACK_PREFIX_DELETE_REMINDER))
+        manager.delete_reminder(reminder_id, chat_id=query.message.chat.id)
+        await query.edit_message_text("🧹 Reminder deleted.", reply_markup=main_menu_keyboard())
 
 
 def build_application(token: str):
@@ -421,8 +449,11 @@ def reminders_message(manager: HabitManager, reminders) -> str:
     """Build a friendly reminder list for Telegram."""
 
     if not reminders:
-        return "🔕 No reminders yet.\n\nSet one with:\n/remind 1 08:30"
-    lines = ["🔔 Active reminders:"]
+        return (
+            "🔕 No reminders yet.\n\n"
+            "Tap a habit/time below, or type:\n/remind 1 08:30"
+        )
+    lines = [f"🔔 Active reminders ({reminder_timezone_name()} time):"]
     for reminder in reminders:
         try:
             habit = manager.get_habit(reminder.habit_id)
@@ -520,6 +551,15 @@ def _parse_remind_command(text: str) -> tuple[int, int, int]:
     except ValueError as exc:
         raise ValueError("Use a numeric habit id and time like 08:30.") from exc
     return habit_id, hour, minute
+
+
+def _parse_reminder_callback(data: str) -> tuple[int, int, int]:
+    """Parse a quick reminder callback like remind:1:08:30."""
+
+    payload = data.removeprefix(CALLBACK_PREFIX_REMIND_QUICK)
+    habit_text, time_text = payload.split(":", maxsplit=1)
+    hour_text, minute_text = time_text.split(":", maxsplit=1)
+    return int(habit_text), int(hour_text), int(minute_text)
 
 
 def _schedule_one_if_available(application, manager: HabitManager, reminder) -> None:

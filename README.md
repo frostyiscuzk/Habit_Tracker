@@ -34,7 +34,7 @@ python -m pytest
 Expected result:
 
 ```text
-25 passed
+28 passed
 ```
 
 The tests are grouped by project requirement:
@@ -45,8 +45,8 @@ The tests are grouped by project requirement:
 | `tests/test_storage.py` | SQLite persistence: habits, completions, and reminders are saved and loaded. |
 | `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage and handles reminders. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
-| `tests/test_bot.py` | Telegram buttons, quick-add buttons, reminders, reset, and Mini App dashboard link. |
-| `tests/test_scheduler.py` | APScheduler reminder jobs are created from saved reminder data. |
+| `tests/test_bot.py` | Telegram buttons, quick-add buttons, reminder add/change/delete, reset, and Mini App dashboard link. |
+| `tests/test_scheduler.py` | APScheduler reminder jobs and timezone behavior. |
 
 ## CLI
 
@@ -94,6 +94,7 @@ Railway if you want the bot to run:
 
 ```text
 TELEGRAM_BOT_TOKEN=your_token_from_BotFather
+APP_TIMEZONE=Europe/Berlin
 ```
 
 Railway starts `python -m src.railway`, which starts the Telegram bot and then
@@ -117,5 +118,6 @@ Streamlit is analytics only. Use Telegram for habit changes:
 ```
 
 The bot also has inline buttons for status, listing habits, quick-adding common
-habits, marking habits done, showing reminders, resetting demo data, showing
-help, and opening the Streamlit analytics dashboard as a Telegram Mini App.
+habits, marking habits done, adding/changing/deleting reminders, resetting demo
+data, showing help, and opening the Streamlit analytics dashboard as a Telegram
+Mini App. Reminder times use `APP_TIMEZONE`, defaulting to Europe/Berlin.

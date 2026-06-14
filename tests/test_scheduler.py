@@ -8,7 +8,7 @@ objects. It does not send Telegram messages during the test.
 import asyncio
 
 from src.reminder import Reminder
-from src.scheduler import ReminderScheduler
+from src.scheduler import ReminderScheduler, reminder_timezone_name
 
 
 class FakeBot:
@@ -31,3 +31,11 @@ def test_scheduler_creates_daily_reminder_job() -> None:
 
     assert scheduler._scheduler.get_job("reminder-5-1") is not None
     loop.close()
+
+
+def test_reminder_timezone_defaults_to_berlin(monkeypatch) -> None:
+    """Reminder times use the app timezone, defaulting to Europe/Berlin."""
+
+    monkeypatch.delenv("APP_TIMEZONE", raising=False)
+
+    assert reminder_timezone_name() == "Europe/Berlin"
