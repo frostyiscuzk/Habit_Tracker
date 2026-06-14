@@ -34,7 +34,7 @@ python -m pytest
 Expected result:
 
 ```text
-40 passed
+42 passed
 ```
 
 The tests are grouped by project requirement:
@@ -45,7 +45,7 @@ The tests are grouped by project requirement:
 | `tests/test_storage.py` | SQLite persistence: habits, completions, and reminders are saved and loaded. |
 | `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage, handles reminders, and blocks duplicate same-day completions. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
-| `tests/test_bot.py` | Telegram buttons, daily/weekly add flow, clear action feedback, Mark Done remaining-list behavior, compact streak display, organized reminder add/change/delete, reset, and Mini App dashboard link. |
+| `tests/test_bot.py` | Telegram buttons, interactive habit list/edit/delete flow, daily/weekly add flow, clear action feedback, Mark Done remaining-list behavior, compact streak display, organized reminder add/change/delete, reset, and Mini App dashboard link. |
 | `tests/test_cli.py` | CLI analytics command exposes the required analytics functions. |
 | `tests/test_fixtures.py` | Demo data includes 5 habits and 4 weeks of completions. |
 | `tests/test_scheduler.py` | APScheduler reminder jobs and timezone behavior. |
@@ -74,7 +74,7 @@ This section shows the corrector exactly where the required programming concepts
 | Functional programming / pure functions | `src/analytics.py` | `current_streak`, `longest_streak_all`, `completion_rate`, and `habits_by_periodicity` receive data as arguments and return calculated results without changing the database. |
 | Error handling / validation | `src/habit.py`, `src/manager.py` | Empty habit names, invalid targets, and missing habit ids are checked with clear errors. |
 | User interface | `src/dashboard.py`, `app.py` | Streamlit is read-only analytics with Overview, Streaks, and Data tabs. |
-| Telegram buttons and management | `src/bot.py` | Telegram bot handles adding, listing, completing, streaks, reminders, archiving, deleting, seeding, and opening Streamlit as a Mini App. |
+| Telegram buttons and management | `src/bot.py` | Telegram bot handles adding, tappable habit list/edit/delete, completing, streaks, reminders, archiving, deleting, seeding, and opening Streamlit as a Mini App. |
 | Reminder scheduler | `src/scheduler.py`, `src/reminder.py` | APScheduler sends daily Telegram reminders saved in SQLite. |
 | Command-line interface | `src/cli.py` | Terminal commands for adding, listing, completing, summarizing, analytics, and seeding habits. |
 | Tests | `tests/` | Unit tests cover models, manager behavior, analytics, CLI, fixtures, bot, scheduler, and SQLite storage. |
@@ -121,9 +121,10 @@ Streamlit is analytics only. Use Telegram for habit changes:
 /seed
 ```
 
-The bot also has inline buttons for status, listing habits, adding daily or
-weekly habits by picking the type and typing the name, marking habits done,
-showing compact current/longest streaks, opening an organized reminder panel
-for adding/changing/deleting reminders, resetting demo data, showing help, and
+The bot also has inline buttons for status, opening a tappable habit list,
+renaming/changing/deleting selected habits, adding daily or weekly habits by
+picking the type and typing the name, marking habits done, showing compact
+current/longest streaks, opening an organized reminder panel for
+adding/changing/deleting reminders, resetting demo data, showing help, and
 opening the Streamlit analytics dashboard as a Telegram Mini App. Reminder
 times use `APP_TIMEZONE`, defaulting to Europe/Berlin.

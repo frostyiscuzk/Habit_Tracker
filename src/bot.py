@@ -20,6 +20,7 @@ from .scheduler import ReminderScheduler, reminder_timezone_name
 
 STATE_ADD_HABIT_PERIODICITY: Final = 1
 STATE_ADD_HABIT_NAME: Final = 2
+STATE_EDIT_HABIT_NAME: Final = 3
 
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
@@ -31,6 +32,10 @@ CALLBACK_STREAKS: Final = "streaks"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
 CALLBACK_PREFIX_ADD_PERIODICITY: Final = "add_periodicity:"
+CALLBACK_PREFIX_HABIT_DETAIL: Final = "habit:"
+CALLBACK_PREFIX_HABIT_EDIT_NAME: Final = "habit_edit_name:"
+CALLBACK_PREFIX_HABIT_DELETE: Final = "habit_delete:"
+CALLBACK_PREFIX_HABIT_TYPE: Final = "habit_type:"
 CALLBACK_PREFIX_REMIND_QUICK: Final = "remind:"
 CALLBACK_PREFIX_DELETE_REMINDER: Final = "delete_reminder:"
 
@@ -90,14 +95,26 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
     habits = manager.list_habits()
     if not habits:
         return "📝 No active habits yet.\n\nTap ➕ Add habit to create one quickly."
-    lines = ["📋 Active habits:"]
+    lines = ["📋 Habits", "", "Tap a habit below to edit or delete."]
     for habit in habits:
         cadence_icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
-        lines.append(
-            f"{cadence_icon} {habit.name} "
-            f"({habit.periodicity.value}, target {habit.target_count})"
-        )
+        lines.append(f"{cadence_icon} {habit.name}")
     return "\n".join(lines)
+
+
+def habit_detail_message(manager: HabitManager, habit_id: int) -> str:
+    """Build one habit detail panel for Telegram."""
+
+    habit = manager.get_habit(habit_id)
+    icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
+    today = "done" if manager.is_completed_on(habit_id, date.today()) else "left"
+    return (
+        f"{icon} {habit.name}\n\n"
+        "┌ Habit\n"
+        f"│ Type: {habit.periodicity.value}\n"
+        f"│ Target: {habit.target_count}\n"
+        f"└ Today: {today}"
+    )
 
 
 def habits_left_today(manager: HabitManager | None = None):
@@ -230,6 +247,59 @@ def add_cancel_keyboard():
     )
 
 
+def habit_list_keyboard(manager: HabitManager | None = None):
+    """Build one button per habit for edit/delete actions."""
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    manager = manager or HabitManager()
+    rows = []
+    for habit in manager.list_habits():
+        if habit.id is None:
+            continue
+        icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    f"{icon} {habit.name}",
+                    callback_data=f"{CALLBACK_PREFIX_HABIT_DETAIL}{habit.id}",
+                )
+            ]
+        )
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)])
+    return InlineKeyboardMarkup(rows)
+
+
+def habit_detail_keyboard(habit):
+    """Build edit/delete buttons for a selected habit."""
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    target_periodicity = "weekly" if habit.periodicity.value == "daily" else "daily"
+    target_icon = "🗓️" if target_periodicity == "weekly" else "☀️"
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "✏️ Rename",
+                    callback_data=f"{CALLBACK_PREFIX_HABIT_EDIT_NAME}{habit.id}",
+                ),
+                InlineKeyboardButton(
+                    f"{target_icon} Make {target_periodicity}",
+                    callback_data=f"{CALLBACK_PREFIX_HABIT_TYPE}{habit.id}:{target_periodicity}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "🗑️ Delete",
+                    callback_data=f"{CALLBACK_PREFIX_HABIT_DELETE}{habit.id}",
+                )
+            ],
+            [InlineKeyboardButton("⬅️ Habits", callback_data=CALLBACK_LIST)],
+        ]
+    )
+
+
 def add_periodicity_keyboard():
     """Build the Daily/Weekly choice shown before entering a habit name."""
 
@@ -319,7 +389,8 @@ async def start(update, context) -> None:
 async def list_habits(update, context) -> None:
     """Handle /list and show active habits."""
 
-    await update.message.reply_text(habit_list_message(), reply_markup=main_menu_keyboard())
+    manager = HabitManager()
+    await update.message.reply_text(habit_list_message(manager), reply_markup=habit_list_keyboard(manager))
 
 
 async def list_streaks(update, context) -> None:
@@ -367,6 +438,37 @@ async def receive_habit_name(update, context) -> int:
     await update.message.reply_text(
         action_update_message(f"✨ Added {icon} {habit.name}", manager),
         reply_markup=main_menu_keyboard(),
+    )
+    return -1
+
+
+async def receive_edit_habit_name(update, context) -> int:
+    """Rename a selected habit after the Rename button."""
+
+    habit_id = context.user_data.get("edit_habit_id")
+    if habit_id is None:
+        await update.message.reply_text("Open 📋 List habits and choose a habit first.", reply_markup=main_menu_keyboard())
+        return -1
+
+    manager = HabitManager()
+    try:
+        habit = manager.get_habit(int(habit_id))
+        updated = manager.update_habit(
+            habit.id or 0,
+            update.message.text.strip(),
+            habit.periodicity,
+            habit.target_count,
+            habit.description,
+            habit.archived,
+        )
+    except ValueError as exc:
+        await update.message.reply_text(str(exc), reply_markup=add_cancel_keyboard())
+        return STATE_EDIT_HABIT_NAME
+
+    context.user_data.pop("edit_habit_id", None)
+    await update.message.reply_text(
+        f"✏️ Renamed to: {updated.name}\n\n{habit_detail_message(manager, updated.id or 0)}",
+        reply_markup=habit_detail_keyboard(updated),
     )
     return -1
 
@@ -504,7 +606,7 @@ async def handle_button(update, context) -> None:
         await query.edit_message_text(status_message(manager), reply_markup=main_menu_keyboard())
         return -1
     elif data == CALLBACK_LIST:
-        await query.edit_message_text(habit_list_message(manager), reply_markup=main_menu_keyboard())
+        await query.edit_message_text(habit_list_message(manager), reply_markup=habit_list_keyboard(manager))
     elif data == CALLBACK_ADD_MENU:
         await query.edit_message_text("➕ New habit type:", reply_markup=add_periodicity_keyboard())
         return STATE_ADD_HABIT_PERIODICITY
@@ -521,6 +623,46 @@ async def handle_button(update, context) -> None:
         return STATE_ADD_HABIT_NAME
     elif data == CALLBACK_STREAKS:
         await query.edit_message_text(streaks_message(manager), reply_markup=main_menu_keyboard())
+    elif data and data.startswith(CALLBACK_PREFIX_HABIT_DETAIL):
+        habit_id = int(data.removeprefix(CALLBACK_PREFIX_HABIT_DETAIL))
+        habit = manager.get_habit(habit_id)
+        await query.edit_message_text(
+            habit_detail_message(manager, habit_id),
+            reply_markup=habit_detail_keyboard(habit),
+        )
+    elif data and data.startswith(CALLBACK_PREFIX_HABIT_EDIT_NAME):
+        habit_id = int(data.removeprefix(CALLBACK_PREFIX_HABIT_EDIT_NAME))
+        habit = manager.get_habit(habit_id)
+        context.user_data["edit_habit_id"] = habit_id
+        await query.edit_message_text(
+            f"✏️ Rename\n\nCurrent: {habit.name}\nSend the new name.",
+            reply_markup=add_cancel_keyboard(),
+        )
+        return STATE_EDIT_HABIT_NAME
+    elif data and data.startswith(CALLBACK_PREFIX_HABIT_DELETE):
+        habit_id = int(data.removeprefix(CALLBACK_PREFIX_HABIT_DELETE))
+        habit = manager.get_habit(habit_id)
+        manager.delete_habit(habit_id)
+        await query.edit_message_text(
+            f"🗑️ Deleted: {habit.name}\n\n{habit_list_message(manager)}",
+            reply_markup=habit_list_keyboard(manager),
+        )
+    elif data and data.startswith(CALLBACK_PREFIX_HABIT_TYPE):
+        payload = data.removeprefix(CALLBACK_PREFIX_HABIT_TYPE)
+        habit_text, periodicity = payload.split(":", maxsplit=1)
+        habit = manager.get_habit(int(habit_text))
+        updated = manager.update_habit(
+            habit.id or 0,
+            habit.name,
+            periodicity,
+            habit.target_count,
+            habit.description,
+            habit.archived,
+        )
+        await query.edit_message_text(
+            f"🔁 Updated type.\n\n{habit_detail_message(manager, updated.id or 0)}",
+            reply_markup=habit_detail_keyboard(updated),
+        )
     elif data == CALLBACK_REMINDERS:
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
@@ -603,6 +745,24 @@ def build_application(token: str):
         },
         fallbacks=[CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_STATUS}$")],
     )
+    edit_conversation = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(
+                handle_button,
+                pattern=f"^{CALLBACK_PREFIX_HABIT_EDIT_NAME}",
+            )
+        ],
+        states={
+            STATE_EDIT_HABIT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_edit_habit_name)
+            ]
+        },
+        fallbacks=[
+            CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_STATUS}$"),
+            CallbackQueryHandler(handle_button, pattern=f"^{CALLBACK_LIST}$"),
+        ],
+    )
+    application.add_handler(edit_conversation)
     application.add_handler(add_conversation)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", start))

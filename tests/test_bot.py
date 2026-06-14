@@ -19,9 +19,14 @@ from src.bot import (
     CALLBACK_STREAKS,
     CALLBACK_PREFIX_ADD_PERIODICITY,
     CALLBACK_PREFIX_DELETE_REMINDER,
+    CALLBACK_PREFIX_HABIT_DELETE,
+    CALLBACK_PREFIX_HABIT_DETAIL,
+    CALLBACK_PREFIX_HABIT_EDIT_NAME,
+    CALLBACK_PREFIX_HABIT_TYPE,
     CALLBACK_PREFIX_REMIND_QUICK,
     STATE_ADD_HABIT_PERIODICITY,
     STATE_ADD_HABIT_NAME,
+    STATE_EDIT_HABIT_NAME,
     _parse_add_command,
     _parse_habit_id,
     _parse_reminder_callback,
@@ -31,7 +36,10 @@ from src.bot import (
     add_cancel_keyboard,
     add_periodicity_keyboard,
     done_menu_message,
+    habit_detail_keyboard,
+    habit_detail_message,
     habit_list_message,
+    habit_list_keyboard,
     habit_done_keyboard,
     main_menu_keyboard,
     reminder_quick_keyboard,
@@ -170,9 +178,49 @@ def test_habit_list_message_uses_manager_data(tmp_path) -> None:
 
     message = habit_list_message(manager)
 
-    assert "Active habits:" in message
+    assert "📋 Habits" in message
     assert "Read" in message
     assert "#1" not in message
+    assert "target" not in message
+
+
+def test_habit_list_keyboard_has_tappable_habit_buttons(tmp_path) -> None:
+    """The list screen should let the user tap a habit to manage it."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+
+    keyboard = habit_list_keyboard(manager)
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert f"{CALLBACK_PREFIX_HABIT_DETAIL}{habit.id}" in callback_data
+
+
+def test_habit_detail_panel_has_edit_type_and_delete_buttons(tmp_path) -> None:
+    """A selected habit should expose edit and delete actions."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+
+    message = habit_detail_message(manager, habit.id or 0)
+    keyboard = habit_detail_keyboard(habit)
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert "☀️ Read" in message
+    assert "│ Type: daily" in message
+    assert "│ Target: 1" in message
+    assert f"{CALLBACK_PREFIX_HABIT_EDIT_NAME}{habit.id}" in callback_data
+    assert f"{CALLBACK_PREFIX_HABIT_DELETE}{habit.id}" in callback_data
+    assert f"{CALLBACK_PREFIX_HABIT_TYPE}{habit.id}:weekly" in callback_data
+    assert STATE_EDIT_HABIT_NAME == 3
 
 
 def test_done_menu_only_shows_habits_left_today(tmp_path) -> None:

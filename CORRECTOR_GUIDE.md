@@ -60,7 +60,7 @@ python -m pytest
 Expected result:
 
 ```text
-40 passed
+42 passed
 ```
 
 What the tests cover:
@@ -70,9 +70,10 @@ What the tests cover:
 - `tests/test_manager.py`: composition/service layer, including reminders and
   duplicate same-day completion prevention.
 - `tests/test_analytics.py`: pure analytics functions, including streaks.
-- `tests/test_bot.py`: Telegram buttons, daily/weekly add flow, clear action
-  feedback, Mark Done remaining-list behavior, compact streak display,
-  organized reminder add/change/delete, reset, and Mini App link.
+- `tests/test_bot.py`: Telegram buttons, interactive habit list/edit/delete
+  flow, daily/weekly add flow, clear action feedback, Mark Done remaining-list
+  behavior, compact streak display, organized reminder add/change/delete,
+  reset, and Mini App link.
 - `tests/test_cli.py`: terminal analytics command.
 - `tests/test_fixtures.py`: demo data has 5 habits and 4 weeks of history.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
@@ -108,6 +109,12 @@ Also test the buttons:
 - ➕ Add habit
 - 🔄 Reset demo
 - 📈 Open analytics dashboard
+
+List habit behavior:
+
+- Tap 📋 List habits.
+- Tap a habit button to open its detail panel.
+- From the detail panel, use ✏️ Rename, ☀️/🗓️ type switch, or 🗑️ Delete.
 
 Add habit behavior:
 
