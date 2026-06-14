@@ -17,8 +17,8 @@ Location: `src/habit.py`
 
 - `DailyHabit` inherits from `Habit`.
 - `WeeklyHabit` inherits from `Habit`.
-- Both subclasses reuse the validation and completion-checking behavior from
-  the base class.
+- Both subclasses reuse validation from the base class and provide their own
+  daily or weekly completion-checking behavior.
 
 ## Composition
 
@@ -59,6 +59,7 @@ Location: `src/storage.py`
 - SQLite stores habits in the `habits` table.
 - SQLite stores completed dates in the `completions` table.
 - SQLite stores Telegram reminders in the `reminders` table.
+- SQLite foreign-key cascades are enabled with `PRAGMA foreign_keys = ON`.
 - The default database file is `data/habits.db`.
 
 ## Functional Programming
@@ -66,10 +67,9 @@ Location: `src/storage.py`
 Location: `src/analytics.py`
 
 - `current_streak()`
-- `longest_streak()`
+- `longest_streak_all()`
 - `completion_rate()`
-- `daily_totals()`
-- `habit_leaderboard()`
+- `habits_by_periodicity()`
 
 These functions calculate values from input data and return results. They do
 not write to the database or change the UI.
@@ -141,6 +141,7 @@ The command-line interface supports:
 - `list`
 - `done`
 - `summary`
+- `analytics`
 - `seed`
 
 ## Tests
@@ -150,10 +151,13 @@ Location: `tests/`
 - `test_habit.py` checks model validation and habit completion logic.
 - `test_storage.py` checks SQLite saving and loading, including reminders.
 - `test_manager.py` checks the app service layer, including reminders.
-- `test_analytics.py` checks streak and completion-rate calculations.
+- `test_analytics.py` checks streak, completion-rate, and periodicity
+  calculations.
 - `test_bot.py` checks Telegram inline buttons, daily/weekly add controls,
   command parsing, compact streak display, reminder add/change/delete controls,
   reset, and the Mini App dashboard link.
+- `test_cli.py` checks that analytics are reachable from the terminal.
+- `test_fixtures.py` checks the 5-habit, 4-week demo dataset.
 - `test_scheduler.py` checks reminder records become APScheduler jobs and use
   the configured timezone.
 

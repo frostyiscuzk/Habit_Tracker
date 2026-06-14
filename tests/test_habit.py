@@ -47,3 +47,10 @@ def test_weekly_habit_completion_uses_target_count() -> None:
     ]
 
     assert habit.is_complete_for(completions, date(2026, 1, 9))
+
+
+def test_daily_and_weekly_subclasses_own_completion_logic() -> None:
+    """Subclasses should provide their own completion behavior."""
+
+    assert DailyHabit.is_complete_for is not Habit.is_complete_for
+    assert WeeklyHabit.is_complete_for is not Habit.is_complete_for

@@ -60,3 +60,19 @@ def test_storage_persists_reminders(tmp_path) -> None:
     assert len(reminders) == 1
     assert reminders[0].hour == 8
     assert reminders[0].minute == 30
+
+
+def test_storage_enforces_foreign_key_cascade(tmp_path) -> None:
+    """SQLite should remove child rows when a habit is deleted."""
+
+    storage = SQLiteStorage(tmp_path / "habits.db")
+    habit = storage.add_habit(Habit(name="Read", periodicity="daily"))
+    storage.add_completion(habit.id or 0, date(2026, 1, 1), "")
+    storage.add_reminder(Reminder(habit_id=habit.id or 0, chat_id=123, hour=8, minute=30))
+
+    # This direct delete proves SQLite's ON DELETE CASCADE is actually enabled.
+    with storage._connection:
+        storage._connection.execute("DELETE FROM habits WHERE id = ?", (habit.id,))
+
+    assert storage.list_completions(habit.id) == []
+    assert storage.list_reminders(chat_id=123) == []

@@ -1,14 +1,14 @@
 # Used to run the automated tests in the tests/ folder.
-pytest
+pytest==8.4.2
 
-# Optional terminal prompt helper for future CLI improvements.
-questionary
+# Terminal prompt helper available for CLI improvements.
+questionary==2.1.1
 
 # Runs the web dashboard UI and is the main Railway app framework.
-streamlit
+streamlit==1.51.0
 
-# Optional dependency for a future Telegram bot interface.
-python-telegram-bot
+# Runs the deployed Telegram management bot.
+python-telegram-bot==21.10
 
 # Runs daily Telegram habit reminders.
-APScheduler
+APScheduler==3.11.2

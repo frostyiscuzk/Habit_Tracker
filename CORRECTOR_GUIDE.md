@@ -60,7 +60,7 @@ python -m pytest
 Expected result:
 
 ```text
-30 passed
+36 passed
 ```
 
 What the tests cover:
@@ -71,6 +71,8 @@ What the tests cover:
 - `tests/test_analytics.py`: pure analytics functions, including streaks.
 - `tests/test_bot.py`: Telegram buttons, daily/weekly add flow, compact streak
   display, reminder add/change/delete, reset, and Mini App link.
+- `tests/test_cli.py`: terminal analytics command.
+- `tests/test_fixtures.py`: demo data has 5 habits and 4 weeks of history.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
 
 ### 3. Test The Already-Running Telegram Bot
@@ -136,6 +138,7 @@ python -m src.cli list
 python -m src.cli add "Read 10 pages" --periodicity daily
 python -m src.cli done 1
 python -m src.cli summary
+python -m src.cli analytics
 ```
 
 ### 5. Test Streamlit Analytics

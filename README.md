@@ -17,7 +17,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Planned Run Command
+## Railway Run Command
 
 ```bash
 streamlit run app.py
@@ -34,7 +34,7 @@ python -m pytest
 Expected result:
 
 ```text
-30 passed
+36 passed
 ```
 
 The tests are grouped by project requirement:
@@ -46,6 +46,8 @@ The tests are grouped by project requirement:
 | `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage and handles reminders. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
 | `tests/test_bot.py` | Telegram buttons, daily/weekly add flow, compact streak display, reminder add/change/delete, reset, and Mini App dashboard link. |
+| `tests/test_cli.py` | CLI analytics command exposes the required analytics functions. |
+| `tests/test_fixtures.py` | Demo data includes 5 habits and 4 weeks of completions. |
 | `tests/test_scheduler.py` | APScheduler reminder jobs and timezone behavior. |
 
 ## CLI
@@ -55,6 +57,7 @@ python -m src.cli add "Read 10 pages" --periodicity daily
 python -m src.cli list
 python -m src.cli done 1
 python -m src.cli summary
+python -m src.cli analytics
 ```
 
 ## Assignment Requirements Map
@@ -64,17 +67,17 @@ This section shows the corrector exactly where the required programming concepts
 | Requirement | Where it is implemented | What to look for |
 | --- | --- | --- |
 | Classes and objects | `src/habit.py` | `Habit`, `DailyHabit`, `WeeklyHabit`, and `Completion` model the main app data. |
-| Inheritance | `src/habit.py` | `DailyHabit` and `WeeklyHabit` inherit from the base `Habit` class. |
+| Inheritance | `src/habit.py` | `DailyHabit` and `WeeklyHabit` inherit from the base `Habit` class and provide their own completion checks. |
 | Composition | `src/manager.py`, `src/dashboard.py` | `HabitManager` contains and uses a `SQLiteStorage` object. The Streamlit dashboard creates a `HabitManager` instead of handling storage directly. |
 | Encapsulation | `src/manager.py`, `src/storage.py` | UI code calls manager methods such as `create_habit()` and `complete_habit()`. SQL details stay inside `SQLiteStorage`. |
-| Data persistence | `src/storage.py` | SQLite tables store habits and completion records in `data/habits.db`. |
-| Functional programming / pure functions | `src/analytics.py` | Analytics functions receive data as arguments and return calculated results without changing the database. |
+| Data persistence | `src/storage.py` | SQLite tables store habits and completion records in `data/habits.db`; foreign-key cascades are enabled. |
+| Functional programming / pure functions | `src/analytics.py` | `current_streak`, `longest_streak_all`, `completion_rate`, and `habits_by_periodicity` receive data as arguments and return calculated results without changing the database. |
 | Error handling / validation | `src/habit.py`, `src/manager.py` | Empty habit names, invalid targets, and missing habit ids are checked with clear errors. |
 | User interface | `src/dashboard.py`, `app.py` | Streamlit is read-only analytics with Overview, Streaks, and Data tabs. |
 | Telegram buttons and management | `src/bot.py` | Telegram bot handles adding, listing, completing, streaks, reminders, archiving, deleting, seeding, and opening Streamlit as a Mini App. |
 | Reminder scheduler | `src/scheduler.py`, `src/reminder.py` | APScheduler sends daily Telegram reminders saved in SQLite. |
-| Command-line interface | `src/cli.py` | Terminal commands for adding, listing, completing, summarizing, and seeding habits. |
-| Tests | `tests/` | Unit tests cover models, manager behavior, analytics, and SQLite storage. |
+| Command-line interface | `src/cli.py` | Terminal commands for adding, listing, completing, summarizing, analytics, and seeding habits. |
+| Tests | `tests/` | Unit tests cover models, manager behavior, analytics, CLI, fixtures, bot, scheduler, and SQLite storage. |
 | Deployment | `Procfile`, `railway.json`, `app.py` | Railway starts the Streamlit app using the platform `PORT`. |
 
 For an even shorter explanation: composition is mainly in `HabitManager`, because the manager is built from another object, `SQLiteStorage`, and delegates database work to it.

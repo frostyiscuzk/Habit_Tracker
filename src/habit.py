@@ -83,18 +83,23 @@ class Habit:
         all completions in the ISO week that contains the selected date.
         """
 
-        count = 0
         if self.is_daily:
-            count = sum(1 for completion in completions if completion.completed_on == day)
-        else:
-            # ISO week avoids mistakes at month boundaries.
-            year, week, _ = day.isocalendar()
-            count = sum(
-                1
-                for completion in completions
-                if completion.completed_on.isocalendar()[:2] == (year, week)
-            )
-        return count >= self.target_count
+            return DailyHabit(
+                id=self.id,
+                name=self.name,
+                target_count=self.target_count,
+                description=self.description,
+                created_at=self.created_at,
+                archived=self.archived,
+            ).is_complete_for(completions, day)
+        return WeeklyHabit(
+            id=self.id,
+            name=self.name,
+            target_count=self.target_count,
+            description=self.description,
+            created_at=self.created_at,
+            archived=self.archived,
+        ).is_complete_for(completions, day)
 
 
 class DailyHabit(Habit):
@@ -106,6 +111,12 @@ class DailyHabit(Habit):
     def __init__(self, name: str, **kwargs: object) -> None:
         super().__init__(name=name, periodicity=Periodicity.DAILY, **kwargs)
 
+    def is_complete_for(self, completions: Iterable[Completion], day: date) -> bool:
+        """Daily habits count completions on the exact selected date."""
+
+        count = sum(1 for completion in completions if completion.completed_on == day)
+        return count >= self.target_count
+
 
 class WeeklyHabit(Habit):
     """Convenience subclass for creating a weekly habit.
@@ -115,3 +126,14 @@ class WeeklyHabit(Habit):
 
     def __init__(self, name: str, **kwargs: object) -> None:
         super().__init__(name=name, periodicity=Periodicity.WEEKLY, **kwargs)
+
+    def is_complete_for(self, completions: Iterable[Completion], day: date) -> bool:
+        """Weekly habits count completions inside the selected ISO week."""
+
+        year, week, _ = day.isocalendar()
+        count = sum(
+            1
+            for completion in completions
+            if completion.completed_on.isocalendar()[:2] == (year, week)
+        )
+        return count >= self.target_count

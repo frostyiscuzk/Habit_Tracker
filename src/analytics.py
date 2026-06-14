@@ -64,6 +64,21 @@ def longest_streak(habit: Habit, completions: list[Completion]) -> int:
     return best
 
 
+def longest_streak_all(habits: list[Habit], completions: list[Completion]) -> int:
+    """Return the longest streak found across all habits."""
+
+    return max((longest_streak(habit, completions) for habit in habits), default=0)
+
+
+def habits_by_periodicity(habits: list[Habit]) -> dict[str, int]:
+    """Count active habits by daily or weekly periodicity."""
+
+    counts = {Periodicity.DAILY.value: 0, Periodicity.WEEKLY.value: 0}
+    for habit in habits:
+        counts[habit.periodicity.value] += 1
+    return counts
+
+
 def period_completed(habit: Habit, completions: list[Completion], day: date) -> bool:
     """Check whether a habit reached its target in the period containing day."""
 

@@ -36,6 +36,7 @@ class SQLiteStorage:
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(self.database_path)
         self._connection.row_factory = sqlite3.Row
+        self._connection.execute("PRAGMA foreign_keys = ON")
         self.initialize()
 
     def initialize(self) -> None:
