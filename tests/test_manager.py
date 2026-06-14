@@ -48,3 +48,15 @@ def test_manager_adds_reminder(tmp_path) -> None:
 
     assert reminder.id is not None
     assert manager.list_reminders(chat_id=123)[0].habit_id == habit.id
+
+
+def test_seed_demo_data_resets_reminders(tmp_path) -> None:
+    """Resetting demo data should clear reminder settings too."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+    manager.add_reminder(habit.id or 0, chat_id=123, hour=8, minute=30)
+
+    manager.seed_demo_data()
+
+    assert manager.list_reminders(chat_id=123) == []

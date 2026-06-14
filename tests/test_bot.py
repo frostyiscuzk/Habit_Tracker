@@ -7,18 +7,23 @@ Telegram, so they are safe to run in normal unit tests.
 """
 
 from src.bot import (
+    CALLBACK_ADD_MENU,
     CALLBACK_DONE_MENU,
     CALLBACK_HELP,
     CALLBACK_LIST,
     CALLBACK_REMINDERS,
     CALLBACK_SEED,
     CALLBACK_STATUS,
+    CALLBACK_PREFIX_QUICK_ADD,
+    CALLBACK_PREFIX_REMIND_MORNING,
     _parse_add_command,
     _parse_habit_id,
     _parse_remind_command,
     dashboard_url,
     habit_list_message,
     main_menu_keyboard,
+    quick_add_keyboard,
+    reminder_quick_keyboard,
     reminders_message,
     start_bot_from_env_once,
 )
@@ -37,6 +42,7 @@ def test_main_menu_keyboard_has_telegram_buttons() -> None:
 
     assert CALLBACK_STATUS in callback_data
     assert CALLBACK_LIST in callback_data
+    assert CALLBACK_ADD_MENU in callback_data
     assert CALLBACK_DONE_MENU in callback_data
     assert CALLBACK_HELP in callback_data
     assert CALLBACK_REMINDERS in callback_data
@@ -55,9 +61,11 @@ def test_main_menu_keyboard_uses_friendly_labels() -> None:
 
     assert "📊 Status" in labels
     assert "📋 List habits" in labels
+    assert "➕ Add habit" in labels
     assert "✅ Mark done" in labels
-    assert "🛠️ Commands" in labels
     assert "⏰ Reminders" in labels
+    assert "🔄 Reset demo" in labels
+    assert "🛠️ Help" in labels
 
 
 def test_main_menu_keyboard_has_dashboard_mini_app(monkeypatch) -> None:
@@ -74,6 +82,37 @@ def test_main_menu_keyboard_has_dashboard_mini_app(monkeypatch) -> None:
     ]
 
     assert "https://example.up.railway.app" in web_app_urls
+
+
+def test_quick_add_keyboard_has_preset_habits() -> None:
+    """Users should be able to add common habits with buttons."""
+
+    keyboard = quick_add_keyboard()
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert f"{CALLBACK_PREFIX_QUICK_ADD}water" in callback_data
+    assert f"{CALLBACK_PREFIX_QUICK_ADD}study" in callback_data
+    assert f"{CALLBACK_PREFIX_QUICK_ADD}exercise" in callback_data
+
+
+def test_reminder_quick_keyboard_has_habit_buttons(tmp_path) -> None:
+    """Users should be able to set a common reminder without typing."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+
+    keyboard = reminder_quick_keyboard(manager)
+    callback_data = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert f"{CALLBACK_PREFIX_REMIND_MORNING}{habit.id}" in callback_data
 
 
 def test_habit_list_message_uses_manager_data(tmp_path) -> None:

@@ -231,6 +231,7 @@ class SQLiteStorage:
         """Replace existing data with a complete demo dataset."""
 
         with self._connection:
+            self._connection.execute("DELETE FROM reminders")
             self._connection.execute("DELETE FROM completions")
             self._connection.execute("DELETE FROM habits")
         id_map: dict[int, int] = {}

@@ -94,10 +94,11 @@ The Telegram bot manages habit changes and uses inline keyboard buttons:
 
 - Status
 - List habits
+- Add habit
 - Mark done
 - Reminders
-- Commands
-- Load demo data
+- Help
+- Reset demo
 - Open analytics dashboard
 
 The important function is:

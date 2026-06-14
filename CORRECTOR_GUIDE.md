@@ -16,8 +16,8 @@ Live Telegram bot:
 Recommended live test order:
 
 1. Open the Telegram bot and send `/start`.
-2. Press the bot buttons: 📊 Status, 📋 List habits, ✅ Mark done, ⏰ Reminders,
-   🛠️ Commands, 🌱 Load demo data, 📈 Open analytics dashboard.
+2. Press the bot buttons: 📊 Status, 📋 List habits, ➕ Add habit, ✅ Mark done,
+   ⏰ Reminders, 🔄 Reset demo, 🛠️ Help, 📈 Open analytics dashboard.
 3. Press 📈 Open analytics dashboard inside Telegram. This opens the Streamlit
    dashboard as a Telegram Mini App.
 4. Open the Railway dashboard link in a browser and check the same read-only
@@ -58,7 +58,7 @@ python -m pytest
 Expected result:
 
 ```text
-22 passed
+25 passed
 ```
 
 What the tests cover:
@@ -67,7 +67,8 @@ What the tests cover:
 - `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
 - `tests/test_manager.py`: composition/service layer, including reminders.
 - `tests/test_analytics.py`: pure analytics functions.
-- `tests/test_bot.py`: Telegram buttons, commands, reminders, and Mini App link.
+- `tests/test_bot.py`: Telegram buttons, quick-add buttons, reminders, reset,
+  and Mini App link.
 - `tests/test_scheduler.py`: APScheduler jobs are created for reminders.
 
 ### 3. Test The Already-Running Telegram Bot
@@ -94,8 +95,9 @@ Also test the buttons:
 - 📋 List habits
 - ✅ Mark done
 - ⏰ Reminders
-- 🛠️ Commands
-- 🌱 Load demo data
+- 🛠️ Help
+- ➕ Add habit
+- 🔄 Reset demo
 - 📈 Open analytics dashboard
 
 The last button opens the Streamlit dashboard as a Telegram Mini App.

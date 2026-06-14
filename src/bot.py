@@ -19,11 +19,21 @@ from .scheduler import ReminderScheduler
 
 CALLBACK_STATUS: Final = "status"
 CALLBACK_LIST: Final = "list"
+CALLBACK_ADD_MENU: Final = "add_menu"
 CALLBACK_DONE_MENU: Final = "done_menu"
 CALLBACK_HELP: Final = "help"
 CALLBACK_REMINDERS: Final = "reminders"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
+CALLBACK_PREFIX_QUICK_ADD: Final = "quick_add:"
+CALLBACK_PREFIX_REMIND_MORNING: Final = "remind_morning:"
+
+QUICK_HABITS: Final = {
+    "water": ("Drink water", "daily", 1),
+    "study": ("Study Python", "daily", 1),
+    "exercise": ("Exercise", "weekly", 3),
+    "plan": ("Plan the week", "weekly", 1),
+}
 
 _bot_lock = threading.Lock()
 _bot_thread: threading.Thread | None = None
@@ -40,7 +50,7 @@ def status_message(manager: HabitManager | None = None) -> str:
         f"📌 Active habits: {summary['active_habits']}\n"
         f"✅ Completed today: {summary['completed_today']}\n"
         f"📅 Completed this week: {summary['completed_this_week']}\n\n"
-        "Use the buttons below, or type /help."
+        "Use the buttons below. Most actions need no typing."
     )
 
 
@@ -50,7 +60,7 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
     manager = manager or HabitManager()
     habits = manager.list_habits()
     if not habits:
-        return "📝 No active habits yet.\n\nCreate one with:\n/add Read 10 pages | daily | 1"
+        return "📝 No active habits yet.\n\nTap ➕ Add habit to create one quickly."
     lines = ["📋 Active habits:"]
     for habit in habits:
         cadence_icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
@@ -68,22 +78,14 @@ def help_message() -> str:
         [
             "🛠️ Manage habits from Telegram",
             "",
-            "➕ Add daily habit:",
+            "Most actions work with buttons.",
+            "",
+            "Optional typed commands:",
             "/add Read 10 pages | daily | 1",
-            "",
-            "➕ Add weekly habit:",
             "/add Gym | weekly | 3",
-            "",
-            "📋 List habits: /list",
-            "✅ Mark done: /done 1",
-            "📦 Archive: /archive 1",
-            "🗑️ Delete: /delete 1",
-            "⏰ Set reminder: /remind 1 08:30",
-            "🔔 List reminders: /reminders",
-            "🧹 Delete reminder: /deletereminder 1",
-            "🌱 Demo data: /seed",
-            "",
-            "📊 Streamlit is only for analytics.",
+            "/done 1",
+            "/remind 1 08:30",
+            "/reminders",
         ]
     )
 
@@ -115,14 +117,15 @@ def main_menu_keyboard():
             InlineKeyboardButton("📋 List habits", callback_data=CALLBACK_LIST),
         ],
         [
+            InlineKeyboardButton("➕ Add habit", callback_data=CALLBACK_ADD_MENU),
             InlineKeyboardButton("✅ Mark done", callback_data=CALLBACK_DONE_MENU),
-            InlineKeyboardButton("🛠️ Commands", callback_data=CALLBACK_HELP),
         ],
         [
             InlineKeyboardButton("⏰ Reminders", callback_data=CALLBACK_REMINDERS),
+            InlineKeyboardButton("🔄 Reset demo", callback_data=CALLBACK_SEED),
         ],
         [
-            InlineKeyboardButton("🌱 Load demo data", callback_data=CALLBACK_SEED),
+            InlineKeyboardButton("🛠️ Help", callback_data=CALLBACK_HELP),
         ],
     ]
     mini_app_url = dashboard_url()
@@ -139,6 +142,26 @@ def main_menu_keyboard():
     return InlineKeyboardMarkup(rows)
 
 
+def quick_add_keyboard():
+    """Build quick-add buttons so users do not need to type habit commands."""
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("💧 Drink water", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}water"),
+                InlineKeyboardButton("🐍 Study Python", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}study"),
+            ],
+            [
+                InlineKeyboardButton("🏃 Exercise", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}exercise"),
+                InlineKeyboardButton("🗓️ Plan week", callback_data=f"{CALLBACK_PREFIX_QUICK_ADD}plan"),
+            ],
+            [InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)],
+        ]
+    )
+
+
 def habit_done_keyboard(manager: HabitManager | None = None):
     """Build one button per active habit so the user can mark it done."""
 
@@ -147,6 +170,26 @@ def habit_done_keyboard(manager: HabitManager | None = None):
     manager = manager or HabitManager()
     rows = [
         [InlineKeyboardButton(f"✅ {habit.name}", callback_data=f"{CALLBACK_PREFIX_DONE}{habit.id}")]
+        for habit in manager.list_habits()
+        if habit.id is not None
+    ]
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)])
+    return InlineKeyboardMarkup(rows)
+
+
+def reminder_quick_keyboard(manager: HabitManager | None = None):
+    """Build quick reminder buttons for active habits at 08:30."""
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    manager = manager or HabitManager()
+    rows = [
+        [
+            InlineKeyboardButton(
+                f"⏰ {habit.name} at 08:30",
+                callback_data=f"{CALLBACK_PREFIX_REMIND_MORNING}{habit.id}",
+            )
+        ]
         for habit in manager.list_habits()
         if habit.id is not None
     ]
@@ -230,10 +273,10 @@ async def delete_habit(update, context) -> None:
 
 
 async def seed_data(update, context) -> None:
-    """Handle /seed and load demo data."""
+    """Handle /seed and reset demo data."""
 
     HabitManager().seed_demo_data()
-    await update.message.reply_text("🌱 Demo data loaded.", reply_markup=main_menu_keyboard())
+    await update.message.reply_text("🔄 Demo data reset.", reply_markup=main_menu_keyboard())
 
 
 async def set_reminder(update, context) -> None:
@@ -292,25 +335,48 @@ async def handle_button(update, context) -> None:
         await query.edit_message_text(status_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_LIST:
         await query.edit_message_text(habit_list_message(manager), reply_markup=main_menu_keyboard())
+    elif data == CALLBACK_ADD_MENU:
+        await query.edit_message_text(
+            "➕ Pick a habit to add quickly:",
+            reply_markup=quick_add_keyboard(),
+        )
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_REMINDERS:
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
-            reminders_message(manager, reminders),
-            reply_markup=main_menu_keyboard(),
+            f"{reminders_message(manager, reminders)}\n\nTap a habit below to set an 08:30 reminder:",
+            reply_markup=reminder_quick_keyboard(manager),
         )
     elif data == CALLBACK_DONE_MENU:
         await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
     elif data == CALLBACK_SEED:
         manager.seed_demo_data()
-        await query.edit_message_text("🌱 Demo data loaded.", reply_markup=main_menu_keyboard())
+        await query.edit_message_text("🔄 Demo data reset.", reply_markup=main_menu_keyboard())
     elif data and data.startswith(CALLBACK_PREFIX_DONE):
         habit_id = int(data.removeprefix(CALLBACK_PREFIX_DONE))
         habit = manager.get_habit(habit_id)
         manager.complete_habit(habit_id)
         await query.edit_message_text(
             f"✅ Marked complete: {habit.name}",
+            reply_markup=main_menu_keyboard(),
+        )
+    elif data and data.startswith(CALLBACK_PREFIX_QUICK_ADD):
+        preset = data.removeprefix(CALLBACK_PREFIX_QUICK_ADD)
+        name, periodicity, target_count = QUICK_HABITS[preset]
+        habit = manager.create_habit(name, periodicity, target_count)
+        await query.edit_message_text(
+            f"✨ Added {habit.name}.",
+            reply_markup=main_menu_keyboard(),
+        )
+    elif data and data.startswith(CALLBACK_PREFIX_REMIND_MORNING):
+        habit_id = int(data.removeprefix(CALLBACK_PREFIX_REMIND_MORNING))
+        chat_id = query.message.chat.id
+        habit = manager.get_habit(habit_id)
+        reminder = manager.add_reminder(habit_id, chat_id, 8, 30)
+        _schedule_one_if_available(context.application, manager, reminder)
+        await query.edit_message_text(
+            f"⏰ Reminder set for {habit.name} at 08:30.",
             reply_markup=main_menu_keyboard(),
         )
 
