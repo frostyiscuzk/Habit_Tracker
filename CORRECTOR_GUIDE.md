@@ -17,10 +17,12 @@ Recommended live test order:
 
 1. Open the Telegram bot and send `/start`.
 2. Press the bot buttons: 📊 Status, 📋 List habits, ➕ Add habit, ✅ Mark done,
-   ⏰ Reminders, 🔄 Reset demo, 🛠️ Help, 📈 Open analytics dashboard.
-3. Press 📈 Open analytics dashboard inside Telegram. This opens the Streamlit
+   🔥 Streaks, ⏰ Reminders, 🔄 Reset demo, 🛠️ Help, 📈 Open analytics dashboard.
+3. Press 🔥 Streaks after marking a habit done. This shows current and longest
+   streaks directly inside Telegram.
+4. Press 📈 Open analytics dashboard inside Telegram. This opens the Streamlit
    dashboard as a Telegram Mini App.
-4. Open the Railway dashboard link in a browser and check the same read-only
+5. Open the Railway dashboard link in a browser and check the same read-only
    analytics tabs.
 
 Important:
@@ -58,7 +60,7 @@ python -m pytest
 Expected result:
 
 ```text
-28 passed
+29 passed
 ```
 
 What the tests cover:
@@ -66,9 +68,9 @@ What the tests cover:
 - `tests/test_habit.py`: OOP, inheritance, validation, daily/weekly logic.
 - `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
 - `tests/test_manager.py`: composition/service layer, including reminders.
-- `tests/test_analytics.py`: pure analytics functions.
-- `tests/test_bot.py`: Telegram buttons, plain-name add flow, reminder
-  add/change/delete, reset, and Mini App link.
+- `tests/test_analytics.py`: pure analytics functions, including streaks.
+- `tests/test_bot.py`: Telegram buttons, plain-name add flow, streak display,
+  reminder add/change/delete, reset, and Mini App link.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
 
 ### 3. Test The Already-Running Telegram Bot
@@ -84,6 +86,7 @@ Try:
 /list
 /add Read 10 pages | daily | 1
 /done 1
+/streaks
 /remind 1 08:30
 /reminders
 /deletereminder 1
@@ -95,6 +98,7 @@ Also test the buttons:
 - 📊 Status
 - 📋 List habits
 - ✅ Mark done
+- 🔥 Streaks
 - ⏰ Reminders
 - 🛠️ Help
 - ➕ Add habit
@@ -119,6 +123,7 @@ Reminder behavior:
   is changed on Railway.
 
 The last button opens the Streamlit dashboard as a Telegram Mini App.
+Inside the Mini App, the Overview and Streaks tabs both show streak analytics.
 
 ### 4. Test The CLI
 
@@ -160,9 +165,9 @@ controls. Habit changes are done through Telegram or CLI.
 | Encapsulation | `src/manager.py`, `src/storage.py` |
 | SQLite persistence | `src/storage.py` |
 | Reminder scheduler | `src/reminder.py`, `src/scheduler.py` |
-| Pure analytics functions | `src/analytics.py` |
+| Pure analytics functions and streak calculations | `src/analytics.py` |
 | Streamlit analytics UI | `src/dashboard.py`, `app.py` |
-| Telegram bot, reminders, and Mini App button | `src/bot.py` |
+| Telegram bot, streaks, reminders, and Mini App button | `src/bot.py` |
 | Railway single-service launcher | `src/railway.py`, `Procfile`, `railway.json` |
 | Tests | `tests/` |
 

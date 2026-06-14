@@ -6,6 +6,8 @@ uses the same manager/data logic as the rest of the app. They do not contact
 Telegram, so they are safe to run in normal unit tests.
 """
 
+from datetime import date, timedelta
+
 from src.bot import (
     CALLBACK_ADD_MENU,
     CALLBACK_DONE_MENU,
@@ -14,6 +16,7 @@ from src.bot import (
     CALLBACK_REMINDERS,
     CALLBACK_SEED,
     CALLBACK_STATUS,
+    CALLBACK_STREAKS,
     CALLBACK_PREFIX_DELETE_REMINDER,
     CALLBACK_PREFIX_REMIND_QUICK,
     STATE_ADD_HABIT_NAME,
@@ -28,6 +31,7 @@ from src.bot import (
     reminder_quick_keyboard,
     reminders_message,
     start_bot_from_env_once,
+    streaks_message,
 )
 from src.manager import HabitManager
 
@@ -48,6 +52,7 @@ def test_main_menu_keyboard_has_telegram_buttons() -> None:
     assert CALLBACK_DONE_MENU in callback_data
     assert CALLBACK_HELP in callback_data
     assert CALLBACK_REMINDERS in callback_data
+    assert CALLBACK_STREAKS in callback_data
     assert CALLBACK_SEED in callback_data
 
 
@@ -65,6 +70,7 @@ def test_main_menu_keyboard_uses_friendly_labels() -> None:
     assert "📋 List habits" in labels
     assert "➕ Add habit" in labels
     assert "✅ Mark done" in labels
+    assert "🔥 Streaks" in labels
     assert "⏰ Reminders" in labels
     assert "🔄 Reset demo" in labels
     assert "🛠️ Help" in labels
@@ -140,6 +146,22 @@ def test_habit_list_message_uses_manager_data(tmp_path) -> None:
 
     assert "Active habits:" in message
     assert "Read" in message
+
+
+def test_streaks_message_uses_manager_analytics(tmp_path) -> None:
+    """Telegram should expose current and longest streak analytics."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+    manager.complete_habit(habit.id or 0, completed_on=date.today() - timedelta(days=1))
+    manager.complete_habit(habit.id or 0, completed_on=date.today())
+
+    message = streaks_message(manager)
+
+    assert "🔥 Habit streaks:" in message
+    assert "Read" in message
+    assert "2 current" in message
+    assert "2 longest" in message
 
 
 def test_add_command_parser_accepts_name_periodicity_and_target() -> None:

@@ -34,13 +34,19 @@ def render_dashboard() -> None:
     manager = get_manager()
     summary = manager.dashboard_summary()
     habits = manager.list_habits(include_archived=True)
+    leaderboard = summary["leaderboard"]
+    best_streak = max(
+        (int(row["longest_streak"]) for row in leaderboard),
+        default=0,
+    )
 
     # Summary metrics give the user a quick overview before the detailed tabs.
-    metric_cols = st.columns(4)
+    metric_cols = st.columns(5)
     metric_cols[0].metric("Active habits", summary["active_habits"])
     metric_cols[1].metric("Done today", summary["completed_today"])
     metric_cols[2].metric("Done this week", summary["completed_this_week"])
-    metric_cols[3].metric("All completions", summary["total_completions"])
+    metric_cols[3].metric("Best streak", best_streak)
+    metric_cols[4].metric("All completions", summary["total_completions"])
 
     tab_overview, tab_streaks, tab_data = st.tabs(["Overview", "Streaks", "Data"])
 
@@ -49,6 +55,12 @@ def render_dashboard() -> None:
         st.subheader("Last 30 days")
         totals = summary["daily_totals"]
         st.bar_chart({day.strftime("%b %d"): total for day, total in totals.items()})
+
+        st.subheader("Top streaks")
+        if leaderboard:
+            st.dataframe(leaderboard[:5], width="stretch", hide_index=True)
+        else:
+            st.info("No streak data yet. Complete a habit from Telegram to start one.")
 
         st.subheader("Active habits")
         active_rows = [
@@ -69,7 +81,6 @@ def render_dashboard() -> None:
     with tab_streaks:
         # The Streaks tab shows calculated analytics from src/analytics.py.
         st.subheader("Habit streaks")
-        leaderboard = summary["leaderboard"]
         if leaderboard:
             st.dataframe(leaderboard, width="stretch", hide_index=True)
         else:

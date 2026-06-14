@@ -25,6 +25,7 @@ CALLBACK_ADD_MENU: Final = "add_menu"
 CALLBACK_DONE_MENU: Final = "done_menu"
 CALLBACK_HELP: Final = "help"
 CALLBACK_REMINDERS: Final = "reminders"
+CALLBACK_STREAKS: Final = "streaks"
 CALLBACK_SEED: Final = "seed"
 CALLBACK_PREFIX_DONE: Final = "done:"
 CALLBACK_PREFIX_REMIND_QUICK: Final = "remind:"
@@ -40,11 +41,20 @@ def status_message(manager: HabitManager | None = None) -> str:
 
     manager = manager or HabitManager()
     summary = manager.dashboard_summary()
+    leaderboard = summary["leaderboard"]
+    streak_line = ""
+    if leaderboard:
+        best = leaderboard[0]
+        streak_line = (
+            f"🔥 Best current streak: {best['habit']} "
+            f"({best['current_streak']} now, {best['longest_streak']} best)\n"
+        )
     return (
         "🌱 Habit Tracker\n\n"
         f"📌 Active habits: {summary['active_habits']}\n"
         f"✅ Completed today: {summary['completed_today']}\n"
         f"📅 Completed this week: {summary['completed_this_week']}\n\n"
+        f"{streak_line}"
         "Use the buttons below. Most actions need no typing."
     )
 
@@ -66,6 +76,23 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
     return "\n".join(lines)
 
 
+def streaks_message(manager: HabitManager | None = None) -> str:
+    """Return current and longest streaks calculated by the analytics layer."""
+
+    manager = manager or HabitManager()
+    leaderboard = manager.dashboard_summary()["leaderboard"]
+    if not leaderboard:
+        return "🔥 No streak data yet.\n\nMark a habit done to start a streak."
+
+    lines = ["🔥 Habit streaks:"]
+    for row in leaderboard:
+        lines.append(
+            f"• {row['habit']}: {row['current_streak']} current, "
+            f"{row['longest_streak']} longest, {row['count']} completions"
+        )
+    return "\n".join(lines)
+
+
 def help_message() -> str:
     """Explain Telegram commands that manage habits."""
 
@@ -79,7 +106,8 @@ def help_message() -> str:
             "1. Tap ➕ Add habit",
             "2. Type the habit name",
             "3. Use ✅ Mark done",
-            "4. Use ⏰ Reminders",
+            "4. Use 🔥 Streaks to check progress",
+            "5. Use ⏰ Reminders",
             "",
             f"Reminder times use {reminder_timezone_name()} time.",
         ]
@@ -117,10 +145,11 @@ def main_menu_keyboard():
             InlineKeyboardButton("✅ Mark done", callback_data=CALLBACK_DONE_MENU),
         ],
         [
+            InlineKeyboardButton("🔥 Streaks", callback_data=CALLBACK_STREAKS),
             InlineKeyboardButton("⏰ Reminders", callback_data=CALLBACK_REMINDERS),
-            InlineKeyboardButton("🔄 Reset demo", callback_data=CALLBACK_SEED),
         ],
         [
+            InlineKeyboardButton("🔄 Reset demo", callback_data=CALLBACK_SEED),
             InlineKeyboardButton("🛠️ Help", callback_data=CALLBACK_HELP),
         ],
     ]
@@ -214,6 +243,12 @@ async def list_habits(update, context) -> None:
     """Handle /list and show active habits."""
 
     await update.message.reply_text(habit_list_message(), reply_markup=main_menu_keyboard())
+
+
+async def list_streaks(update, context) -> None:
+    """Handle /streaks and show calculated streak analytics."""
+
+    await update.message.reply_text(streaks_message(), reply_markup=main_menu_keyboard())
 
 
 async def add_habit(update, context) -> None:
@@ -367,6 +402,8 @@ async def handle_button(update, context) -> None:
         return STATE_ADD_HABIT_NAME
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
+    elif data == CALLBACK_STREAKS:
+        await query.edit_message_text(streaks_message(manager), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_REMINDERS:
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
@@ -432,6 +469,7 @@ def build_application(token: str):
     application.add_handler(CommandHandler("status", start))
     application.add_handler(CommandHandler("help", start))
     application.add_handler(CommandHandler("list", list_habits))
+    application.add_handler(CommandHandler("streaks", list_streaks))
     application.add_handler(CommandHandler("add", add_habit))
     application.add_handler(CommandHandler("done", done_habit))
     application.add_handler(CommandHandler("archive", archive_habit))
