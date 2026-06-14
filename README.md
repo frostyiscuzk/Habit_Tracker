@@ -1,6 +1,12 @@
 # Habit Tracker
 
-Beginner-friendly Python habit tracker for the OOFPP portfolio assignment. The app includes object-oriented habit models, SQLite persistence, analytics, a CLI, and a Streamlit dashboard that can be deployed to Railway.
+Beginner-friendly Python habit tracker for the OOFPP portfolio assignment. The app includes object-oriented habit models, SQLite persistence, analytics, a Telegram management bot, a CLI, and a read-only Streamlit analytics dashboard that can be deployed to Railway.
+
+## Corrector Start Here
+
+Open [CORRECTOR_GUIDE.md](CORRECTOR_GUIDE.md). It explains exactly how to install
+`requirements.txt`, run tests, message the already-running Telegram bot, test
+the CLI, open Streamlit, and find each assignment requirement.
 
 ## Setup
 
@@ -27,7 +33,7 @@ python -m pytest
 Expected result:
 
 ```text
-9 passed
+16 passed
 ```
 
 The tests are grouped by project requirement:
@@ -38,7 +44,7 @@ The tests are grouped by project requirement:
 | `tests/test_storage.py` | SQLite persistence: habits and completions are saved, loaded, archived, and filtered. |
 | `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage and returns dashboard summaries. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
-| `tests/test_bot.py` | Telegram inline buttons exist and the bot uses manager data. |
+| `tests/test_bot.py` | Telegram inline buttons, command parsing, and Mini App dashboard link. |
 
 ## CLI
 
@@ -62,8 +68,8 @@ This section shows the corrector exactly where the required programming concepts
 | Data persistence | `src/storage.py` | SQLite tables store habits and completion records in `data/habits.db`. |
 | Functional programming / pure functions | `src/analytics.py` | Analytics functions receive data as arguments and return calculated results without changing the database. |
 | Error handling / validation | `src/habit.py`, `src/manager.py` | Empty habit names, invalid targets, and missing habit ids are checked with clear errors. |
-| User interface | `src/dashboard.py`, `app.py` | Streamlit dashboard with tabs for Today, Habits, Analytics, and Data. |
-| Telegram buttons | `src/bot.py` | Optional Telegram bot uses inline keyboard buttons for status, habit list, mark done, and demo data. |
+| User interface | `src/dashboard.py`, `app.py` | Streamlit is read-only analytics with Overview, Streaks, and Data tabs. |
+| Telegram buttons and management | `src/bot.py` | Telegram bot handles adding, listing, completing, archiving, deleting, seeding, and opening Streamlit as a Mini App. |
 | Command-line interface | `src/cli.py` | Terminal commands for adding, listing, completing, summarizing, and seeding habits. |
 | Tests | `tests/` | Unit tests cover models, manager behavior, analytics, and SQLite storage. |
 | Deployment | `Procfile`, `railway.json`, `app.py` | Railway starts the Streamlit app using the platform `PORT`. |
@@ -79,3 +85,31 @@ railway up
 ```
 
 The app stores data in `data/habits.db` by default. Set `DATABASE_PATH` if you want a different SQLite file path.
+
+Use the same Railway service for Streamlit and Telegram. Add this variable in
+Railway if you want the bot to run:
+
+```text
+TELEGRAM_BOT_TOKEN=your_token_from_BotFather
+```
+
+Railway starts `python -m src.railway`, which starts the Telegram bot and then
+starts the read-only Streamlit analytics dashboard.
+
+## Telegram Management Bot
+
+Streamlit is analytics only. Use Telegram for habit changes:
+
+```text
+/add Read 10 pages | daily | 1
+/add Gym | weekly | 3
+/list
+/done 1
+/archive 1
+/delete 1
+/seed
+```
+
+The bot also has inline buttons for status, listing habits, marking habits done,
+showing commands, loading demo data, and opening the Streamlit analytics
+dashboard as a Telegram Mini App.

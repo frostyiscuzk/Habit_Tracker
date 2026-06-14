@@ -39,15 +39,16 @@ manager = get_manager()
 summary = manager.dashboard_summary()
 ```
 
-The UI is also composed with the manager. The dashboard uses `HabitManager`
-instead of doing database work directly.
+The analytics UI is also composed with the manager. The dashboard uses
+`HabitManager` to read summaries instead of doing database work directly.
 
 ## Encapsulation
 
 Locations: `src/manager.py` and `src/storage.py`
 
-- The dashboard calls simple methods such as `create_habit()` and
+- The bot and CLI call simple methods such as `create_habit()` and
   `complete_habit()`.
+- The dashboard calls read-only summary/list methods.
 - SQL code is hidden inside `SQLiteStorage`.
 - This keeps implementation details away from the UI.
 
@@ -72,27 +73,30 @@ Location: `src/analytics.py`
 These functions calculate values from input data and return results. They do
 not write to the database or change the UI.
 
-## User Interface
+## Streamlit Analytics Interface
 
 Locations: `app.py` and `src/dashboard.py`
 
 - `app.py` is the Streamlit/Railway entrypoint.
-- `src/dashboard.py` builds the tabs:
-  - Today
-  - Habits
-  - Analytics
+- `src/dashboard.py` is read-only analytics.
+- It does not create, edit, complete, archive, or delete habits.
+- It builds the tabs:
+  - Overview
+  - Streaks
   - Data
 
 ## Telegram Bot With Buttons
 
 Location: `src/bot.py`
 
-The optional Telegram bot uses inline keyboard buttons:
+The Telegram bot manages habit changes and uses inline keyboard buttons:
 
 - Status
 - List habits
 - Mark done
+- Commands
 - Load demo data
+- Open analytics dashboard
 
 The important function is:
 
@@ -102,6 +106,18 @@ main_menu_keyboard()
 
 It creates `InlineKeyboardButton` objects and returns an
 `InlineKeyboardMarkup`. The button callbacks are handled by `handle_button()`.
+The dashboard button uses Telegram's `WebAppInfo` to open Streamlit as a Mini
+App.
+
+The bot also has text commands for actions that need typed data:
+
+- `/add Read 10 pages | daily | 1`
+- `/add Gym | weekly | 3`
+- `/list`
+- `/done 1`
+- `/archive 1`
+- `/delete 1`
+- `/seed`
 
 ## CLI
 
@@ -123,14 +139,24 @@ Location: `tests/`
 - `test_storage.py` checks SQLite saving and loading.
 - `test_manager.py` checks the app service layer.
 - `test_analytics.py` checks streak and completion-rate calculations.
-- `test_bot.py` checks that Telegram inline buttons are present.
+- `test_bot.py` checks that Telegram inline buttons, command parsing, and the
+  Mini App dashboard link are present.
 
 ## Deployment
 
 Locations: `Procfile`, `railway.json`, and `app.py`
 
-Railway runs the Streamlit app with the platform port:
+Railway runs one service. `src/railway.py` starts the Telegram bot first, then
+starts Streamlit.
+
+Railway start command:
 
 ```bash
-streamlit run app.py --server.address 0.0.0.0 --server.port ${PORT:-8501}
+python -m src.railway
+```
+
+The Telegram token is configured in the same Railway service:
+
+```text
+TELEGRAM_BOT_TOKEN=your_token_from_BotFather
 ```
