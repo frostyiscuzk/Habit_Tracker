@@ -231,21 +231,25 @@ def reminder_quick_keyboard(manager: HabitManager | None = None, chat_id: int | 
         rows.append(
             [
                 InlineKeyboardButton(
-                    f"🌅 {habit.name} 08:30",
+                    f"🌅 {habit.name}",
                     callback_data=f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:08:30",
                 ),
                 InlineKeyboardButton(
-                    f"🌙 {habit.name} 20:00",
+                    f"🌙 {habit.name}",
                     callback_data=f"{CALLBACK_PREFIX_REMIND_QUICK}{habit.id}:20:00",
                 ),
             ]
         )
     if chat_id is not None:
         for reminder in manager.list_reminders(chat_id=chat_id):
+            try:
+                habit_name = manager.get_habit(reminder.habit_id).name
+            except ValueError:
+                habit_name = "Deleted habit"
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"🧹 Delete reminder #{reminder.id}",
+                        f"🗑️ {habit_name} {reminder.hour:02d}:{reminder.minute:02d}",
                         callback_data=f"{CALLBACK_PREFIX_DELETE_REMINDER}{reminder.id}",
                     )
                 ]
@@ -380,11 +384,11 @@ async def set_reminder(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
+    reminders = manager.list_reminders(chat_id=chat_id)
     await update.message.reply_text(
-        f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d} "
-        f"({reminder_timezone_name()} time).\n\n"
-        "To change it, set another reminder for the same habit.",
-        reply_markup=main_menu_keyboard(),
+        f"✅ {habit.name}: {hour:02d}:{minute:02d}\n\n"
+        f"{reminders_message(manager, reminders)}",
+        reply_markup=reminder_quick_keyboard(manager, chat_id=chat_id),
     )
 
 
@@ -395,7 +399,7 @@ async def list_reminders(update, context) -> None:
     reminders = manager.list_reminders(chat_id=update.effective_chat.id)
     await update.message.reply_text(
         reminders_message(manager, reminders),
-        reply_markup=main_menu_keyboard(),
+        reply_markup=reminder_quick_keyboard(manager, chat_id=update.effective_chat.id),
     )
 
 
@@ -404,12 +408,17 @@ async def delete_reminder(update, context) -> None:
 
     try:
         reminder_id = _parse_habit_id(update.message.text, "/deletereminder")
-        HabitManager().delete_reminder(reminder_id, chat_id=update.effective_chat.id)
+        manager = HabitManager()
+        manager.delete_reminder(reminder_id, chat_id=update.effective_chat.id)
     except ValueError as exc:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text("🧹 Reminder deleted.", reply_markup=main_menu_keyboard())
+    reminders = manager.list_reminders(chat_id=update.effective_chat.id)
+    await update.message.reply_text(
+        f"🗑️ Removed.\n\n{reminders_message(manager, reminders)}",
+        reply_markup=reminder_quick_keyboard(manager, chat_id=update.effective_chat.id),
+    )
 
 
 async def handle_button(update, context) -> None:
@@ -444,8 +453,7 @@ async def handle_button(update, context) -> None:
     elif data == CALLBACK_REMINDERS:
         reminders = manager.list_reminders(chat_id=query.message.chat.id)
         await query.edit_message_text(
-            f"{reminders_message(manager, reminders)}\n\n"
-            "Tap a habit/time to add or change a reminder:",
+            reminders_message(manager, reminders),
             reply_markup=reminder_quick_keyboard(manager, chat_id=query.message.chat.id),
         )
     elif data == CALLBACK_DONE_MENU:
@@ -467,16 +475,20 @@ async def handle_button(update, context) -> None:
         habit = manager.get_habit(habit_id)
         reminder = manager.add_reminder(habit_id, chat_id, hour, minute)
         _schedule_one_if_available(context.application, manager, reminder)
+        reminders = manager.list_reminders(chat_id=chat_id)
         await query.edit_message_text(
-            f"⏰ Reminder set for {habit.name} at {hour:02d}:{minute:02d} "
-            f"({reminder_timezone_name()} time).\n\n"
-            "Setting another time for the same habit changes it.",
-            reply_markup=main_menu_keyboard(),
+            f"✅ {habit.name}: {hour:02d}:{minute:02d}\n\n"
+            f"{reminders_message(manager, reminders)}",
+            reply_markup=reminder_quick_keyboard(manager, chat_id=chat_id),
         )
     elif data and data.startswith(CALLBACK_PREFIX_DELETE_REMINDER):
         reminder_id = int(data.removeprefix(CALLBACK_PREFIX_DELETE_REMINDER))
         manager.delete_reminder(reminder_id, chat_id=query.message.chat.id)
-        await query.edit_message_text("🧹 Reminder deleted.", reply_markup=main_menu_keyboard())
+        reminders = manager.list_reminders(chat_id=query.message.chat.id)
+        await query.edit_message_text(
+            f"🗑️ Removed.\n\n{reminders_message(manager, reminders)}",
+            reply_markup=reminder_quick_keyboard(manager, chat_id=query.message.chat.id),
+        )
 
 
 def build_application(token: str):
@@ -544,20 +556,38 @@ def reminders_message(manager: HabitManager, reminders) -> str:
 
     if not reminders:
         return (
-            "🔕 No reminders yet.\n\n"
-            "Tap a habit/time below, or type:\n/remind 1 08:30"
+            "⏰ Reminders\n\n"
+            "┌ Active\n"
+            "│ none\n"
+            f"└ {reminder_timezone_name()} time\n\n"
+            "Add: tap 🌅 or 🌙 next to a habit."
         )
-    lines = [f"🔔 Active reminders ({reminder_timezone_name()} time):"]
+    lines = ["⏰ Reminders", "", "┌ Active"]
     for reminder in reminders:
         try:
             habit = manager.get_habit(reminder.habit_id)
             habit_name = habit.name
         except ValueError:
             habit_name = "Deleted habit"
+        icon = _reminder_time_icon(reminder.hour)
         lines.append(
-            f"#{reminder.id} {habit_name} at {reminder.hour:02d}:{reminder.minute:02d}"
+            f"│ {icon} {habit_name}  {reminder.hour:02d}:{reminder.minute:02d}"
         )
+    lines.extend(
+        [
+            f"└ {reminder_timezone_name()} time",
+            "",
+            "Add/change: tap 🌅 or 🌙.",
+            "Remove: tap 🗑️.",
+        ]
+    )
     return "\n".join(lines)
+
+
+def _reminder_time_icon(hour: int) -> str:
+    """Return a compact visual marker for reminder time."""
+
+    return "🌅" if hour < 18 else "🌙"
 
 
 def start_bot_from_env_once() -> bool:

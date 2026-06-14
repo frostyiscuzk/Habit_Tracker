@@ -155,6 +155,8 @@ def test_reminder_quick_keyboard_has_delete_buttons(tmp_path) -> None:
     ]
 
     assert f"{CALLBACK_PREFIX_DELETE_REMINDER}{reminder.id}" in callback_data
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+    assert "🗑️ Read 08:30" in labels
 
 
 def test_habit_list_message_uses_manager_data(tmp_path) -> None:
@@ -220,8 +222,23 @@ def test_reminders_message_lists_saved_reminders(tmp_path) -> None:
 
     message = reminders_message(manager, [reminder])
 
-    assert "🔔 Active reminders (Europe/Berlin time):" in message
-    assert "Read at 08:30" in message
+    assert "⏰ Reminders" in message
+    assert "┌ Active" in message
+    assert "│ 🌅 Read  08:30" in message
+    assert "└ Europe/Berlin time" in message
+    assert "Add/change: tap 🌅 or 🌙." in message
+    assert "Remove: tap 🗑️." in message
+
+
+def test_reminders_message_empty_state_is_compact(tmp_path) -> None:
+    """The empty reminder screen should still explain the button flow briefly."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+
+    message = reminders_message(manager, [])
+
+    assert "│ none" in message
+    assert "Add: tap 🌅 or 🌙 next to a habit." in message
 
 
 def test_bot_does_not_start_without_token(monkeypatch) -> None:

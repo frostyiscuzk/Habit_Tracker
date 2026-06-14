@@ -117,6 +117,10 @@ The Add habit button first asks the user to choose `Daily` or `Weekly`, then it
 asks for the habit name. This keeps the normal Telegram flow button-based while
 still supporting both required periodicities.
 
+The Reminders button opens a compact text panel. The user can tap a day/night
+button next to a habit to add or change a reminder, or tap a trash button to
+delete an active reminder.
+
 The bot also has text commands for actions that need typed data:
 
 - `/add Read 10 pages | daily | 1`
@@ -154,8 +158,8 @@ Location: `tests/`
 - `test_analytics.py` checks streak, completion-rate, and periodicity
   calculations.
 - `test_bot.py` checks Telegram inline buttons, daily/weekly add controls,
-  command parsing, compact streak display, reminder add/change/delete controls,
-  reset, and the Mini App dashboard link.
+  command parsing, compact streak display, organized reminder add/change/delete
+  controls, reset, and the Mini App dashboard link.
 - `test_cli.py` checks that analytics are reachable from the terminal.
 - `test_fixtures.py` checks the 5-habit, 4-week demo dataset.
 - `test_scheduler.py` checks reminder records become APScheduler jobs and use

@@ -60,7 +60,7 @@ python -m pytest
 Expected result:
 
 ```text
-36 passed
+37 passed
 ```
 
 What the tests cover:
@@ -70,7 +70,7 @@ What the tests cover:
 - `tests/test_manager.py`: composition/service layer, including reminders.
 - `tests/test_analytics.py`: pure analytics functions, including streaks.
 - `tests/test_bot.py`: Telegram buttons, daily/weekly add flow, compact streak
-  display, reminder add/change/delete, reset, and Mini App link.
+  display, organized reminder add/change/delete, reset, and Mini App link.
 - `tests/test_cli.py`: terminal analytics command.
 - `tests/test_fixtures.py`: demo data has 5 habits and 4 weeks of history.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
@@ -118,10 +118,11 @@ Add habit behavior:
 
 Reminder behavior:
 
-- Tap ⏰ Reminders to see saved reminders.
-- Tap a habit/time button such as 🌅 Read 08:30 or 🌙 Read 20:00 to add a reminder.
-- Tapping a different time for the same habit changes that reminder.
-- Tap 🧹 Delete reminder #... to remove a reminder.
+- Tap ⏰ Reminders to open the reminder panel.
+- The panel shows active reminders in a compact text layout.
+- Tap 🌅 next to a habit to add/change a day reminder at 08:30.
+- Tap 🌙 next to a habit to add/change a night reminder at 20:00.
+- Tap the 🗑️ row to remove an active reminder.
 - Reminder times use the app timezone, currently Europe/Berlin unless `APP_TIMEZONE`
   is changed on Railway.
 
