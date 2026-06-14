@@ -6,7 +6,8 @@ Beginner-friendly Python habit tracker for the OOFPP portfolio assignment. The a
 
 Open [CORRECTOR_GUIDE.md](CORRECTOR_GUIDE.md). It explains exactly how to install
 `requirements.txt`, run tests, message the already-running Telegram bot, test
-the CLI, open Streamlit, and find each assignment requirement.
+the Telegram Mini App dashboard, test the CLI, open Streamlit, and find each
+assignment requirement.
 
 ## Setup
 
@@ -33,7 +34,7 @@ python -m pytest
 Expected result:
 
 ```text
-16 passed
+17 passed
 ```
 
 The tests are grouped by project requirement:

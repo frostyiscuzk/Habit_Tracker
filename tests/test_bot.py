@@ -39,6 +39,22 @@ def test_main_menu_keyboard_has_telegram_buttons() -> None:
     assert CALLBACK_SEED in callback_data
 
 
+def test_main_menu_keyboard_uses_friendly_labels() -> None:
+    """The Telegram buttons should be readable and friendly for users."""
+
+    keyboard = main_menu_keyboard()
+    labels = [
+        button.text
+        for row in keyboard.inline_keyboard
+        for button in row
+    ]
+
+    assert "📊 Status" in labels
+    assert "📋 List habits" in labels
+    assert "✅ Mark done" in labels
+    assert "🛠️ Commands" in labels
+
+
 def test_main_menu_keyboard_has_dashboard_mini_app(monkeypatch) -> None:
     """Telegram should expose the Streamlit analytics dashboard as a Mini App."""
 

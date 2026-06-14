@@ -33,10 +33,11 @@ def status_message(manager: HabitManager | None = None) -> str:
     manager = manager or HabitManager()
     summary = manager.dashboard_summary()
     return (
-        "Habit Tracker\n"
-        f"Active habits: {summary['active_habits']}\n"
-        f"Completed today: {summary['completed_today']}\n"
-        f"Completed this week: {summary['completed_this_week']}"
+        "🌱 Habit Tracker\n\n"
+        f"📌 Active habits: {summary['active_habits']}\n"
+        f"✅ Completed today: {summary['completed_today']}\n"
+        f"📅 Completed this week: {summary['completed_this_week']}\n\n"
+        "Use the buttons below, or type /help."
     )
 
 
@@ -46,11 +47,13 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
     manager = manager or HabitManager()
     habits = manager.list_habits()
     if not habits:
-        return "No active habits yet. Create habits in the dashboard or CLI."
-    lines = ["Active habits:"]
+        return "📝 No active habits yet.\n\nCreate one with:\n/add Read 10 pages | daily | 1"
+    lines = ["📋 Active habits:"]
     for habit in habits:
+        cadence_icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
         lines.append(
-            f"#{habit.id} {habit.name} ({habit.periodicity.value}, target {habit.target_count})"
+            f"{cadence_icon} #{habit.id} {habit.name} "
+            f"({habit.periodicity.value}, target {habit.target_count})"
         )
     return "\n".join(lines)
 
@@ -60,16 +63,21 @@ def help_message() -> str:
 
     return "\n".join(
         [
-            "Manage habits from Telegram:",
-            "/add Habit name | daily | 1",
-            "/add Gym | weekly | 3",
-            "/list",
-            "/done 1",
-            "/archive 1",
-            "/delete 1",
-            "/seed",
+            "🛠️ Manage habits from Telegram",
             "",
-            "Streamlit is only for analytics.",
+            "➕ Add daily habit:",
+            "/add Read 10 pages | daily | 1",
+            "",
+            "➕ Add weekly habit:",
+            "/add Gym | weekly | 3",
+            "",
+            "📋 List habits: /list",
+            "✅ Mark done: /done 1",
+            "📦 Archive: /archive 1",
+            "🗑️ Delete: /delete 1",
+            "🌱 Demo data: /seed",
+            "",
+            "📊 Streamlit is only for analytics.",
         ]
     )
 
@@ -97,15 +105,15 @@ def main_menu_keyboard():
 
     rows = [
         [
-            InlineKeyboardButton("Status", callback_data=CALLBACK_STATUS),
-            InlineKeyboardButton("List habits", callback_data=CALLBACK_LIST),
+            InlineKeyboardButton("📊 Status", callback_data=CALLBACK_STATUS),
+            InlineKeyboardButton("📋 List habits", callback_data=CALLBACK_LIST),
         ],
         [
-            InlineKeyboardButton("Mark done", callback_data=CALLBACK_DONE_MENU),
-            InlineKeyboardButton("Commands", callback_data=CALLBACK_HELP),
+            InlineKeyboardButton("✅ Mark done", callback_data=CALLBACK_DONE_MENU),
+            InlineKeyboardButton("🛠️ Commands", callback_data=CALLBACK_HELP),
         ],
         [
-            InlineKeyboardButton("Load demo data", callback_data=CALLBACK_SEED),
+            InlineKeyboardButton("🌱 Load demo data", callback_data=CALLBACK_SEED),
         ],
     ]
     mini_app_url = dashboard_url()
@@ -113,7 +121,7 @@ def main_menu_keyboard():
         rows.append(
             [
                 InlineKeyboardButton(
-                    "Open analytics dashboard",
+                    "📈 Open analytics dashboard",
                     web_app=WebAppInfo(url=mini_app_url),
                 )
             ]
@@ -129,11 +137,11 @@ def habit_done_keyboard(manager: HabitManager | None = None):
 
     manager = manager or HabitManager()
     rows = [
-        [InlineKeyboardButton(habit.name, callback_data=f"{CALLBACK_PREFIX_DONE}{habit.id}")]
+        [InlineKeyboardButton(f"✅ {habit.name}", callback_data=f"{CALLBACK_PREFIX_DONE}{habit.id}")]
         for habit in manager.list_habits()
         if habit.id is not None
     ]
-    rows.append([InlineKeyboardButton("Back", callback_data=CALLBACK_STATUS)])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)])
     return InlineKeyboardMarkup(rows)
 
 
@@ -141,7 +149,7 @@ async def start(update, context) -> None:
     """Handle /start and show the main button menu."""
 
     await update.message.reply_text(
-        f"{status_message()}\n\n{help_message()}",
+        f"👋 Welcome!\n\n{status_message()}\n\n{help_message()}",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -164,7 +172,7 @@ async def add_habit(update, context) -> None:
         return
 
     await update.message.reply_text(
-        f"Created habit #{habit.id}: {habit.name}",
+        f"✨ Created habit #{habit.id}: {habit.name}",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -181,7 +189,7 @@ async def done_habit(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"Marked complete: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(f"✅ Marked complete: {habit.name}", reply_markup=main_menu_keyboard())
 
 
 async def archive_habit(update, context) -> None:
@@ -194,7 +202,7 @@ async def archive_habit(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"Archived habit: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(f"📦 Archived habit: {habit.name}", reply_markup=main_menu_keyboard())
 
 
 async def delete_habit(update, context) -> None:
@@ -209,14 +217,14 @@ async def delete_habit(update, context) -> None:
         await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
         return
 
-    await update.message.reply_text(f"Deleted habit: {habit.name}", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(f"🗑️ Deleted habit: {habit.name}", reply_markup=main_menu_keyboard())
 
 
 async def seed_data(update, context) -> None:
     """Handle /seed and load demo data."""
 
     HabitManager().seed_demo_data()
-    await update.message.reply_text("Demo data loaded.", reply_markup=main_menu_keyboard())
+    await update.message.reply_text("🌱 Demo data loaded.", reply_markup=main_menu_keyboard())
 
 
 async def handle_button(update, context) -> None:
@@ -234,16 +242,16 @@ async def handle_button(update, context) -> None:
     elif data == CALLBACK_HELP:
         await query.edit_message_text(help_message(), reply_markup=main_menu_keyboard())
     elif data == CALLBACK_DONE_MENU:
-        await query.edit_message_text("Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
+        await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
     elif data == CALLBACK_SEED:
         manager.seed_demo_data()
-        await query.edit_message_text("Demo data loaded.", reply_markup=main_menu_keyboard())
+        await query.edit_message_text("🌱 Demo data loaded.", reply_markup=main_menu_keyboard())
     elif data and data.startswith(CALLBACK_PREFIX_DONE):
         habit_id = int(data.removeprefix(CALLBACK_PREFIX_DONE))
         habit = manager.get_habit(habit_id)
         manager.complete_habit(habit_id)
         await query.edit_message_text(
-            f"Marked complete: {habit.name}",
+            f"✅ Marked complete: {habit.name}",
             reply_markup=main_menu_keyboard(),
         )
 
