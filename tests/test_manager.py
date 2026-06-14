@@ -7,6 +7,8 @@ with SQLiteStorage, then the UI and CLI can use manager methods instead of SQL.
 
 from datetime import date
 
+import pytest
+
 from src.manager import HabitManager
 
 
@@ -23,6 +25,18 @@ def test_manager_creates_and_completes_habit(tmp_path) -> None:
 
     assert summary["active_habits"] == 1
     assert summary["total_completions"] == 1
+
+
+def test_manager_rejects_duplicate_completion_on_same_day(tmp_path) -> None:
+    """A habit should not be completed twice on the same date."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    habit = manager.create_habit("Read", "daily")
+
+    manager.complete_habit(habit.id or 0, date(2026, 1, 1))
+
+    with pytest.raises(ValueError, match="Already completed today: Read."):
+        manager.complete_habit(habit.id or 0, date(2026, 1, 1), note="again")
 
 
 def test_manager_archives_habit(tmp_path) -> None:

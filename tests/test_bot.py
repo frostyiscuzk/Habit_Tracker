@@ -30,7 +30,9 @@ from src.bot import (
     dashboard_url,
     add_cancel_keyboard,
     add_periodicity_keyboard,
+    done_menu_message,
     habit_list_message,
+    habit_done_keyboard,
     main_menu_keyboard,
     reminder_quick_keyboard,
     reminders_message,
@@ -172,6 +174,24 @@ def test_habit_list_message_uses_manager_data(tmp_path) -> None:
     assert "Read" in message
 
 
+def test_done_menu_only_shows_habits_left_today(tmp_path) -> None:
+    """Completed-today habits should not remain as Mark Done choices."""
+
+    manager = HabitManager(database_path=tmp_path / "habits.db")
+    read = manager.create_habit("Read", "daily")
+    manager.create_habit("Gym", "daily")
+    manager.complete_habit(read.id or 0, completed_on=date.today())
+
+    message = done_menu_message(manager)
+    keyboard = habit_done_keyboard(manager)
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+
+    assert "Gym" in message
+    assert "Read" not in message
+    assert "✅ Gym" in labels
+    assert "✅ Read" not in labels
+
+
 def test_action_update_message_confirms_change_and_counts(tmp_path) -> None:
     """Mutation feedback should clearly say what happened and show new counts."""
 
@@ -185,7 +205,8 @@ def test_action_update_message_confirms_change_and_counts(tmp_path) -> None:
     assert "┌ Updated" in message
     assert "│ Done today: 1" in message
     assert "│ This week: 1" in message
-    assert "└ Active habits: 1" in message
+    assert "│ Left today: 0" in message
+    assert "└ Next: all done" in message
 
 
 def test_streaks_message_uses_manager_analytics(tmp_path) -> None:

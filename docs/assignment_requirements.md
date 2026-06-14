@@ -50,6 +50,8 @@ Locations: `src/manager.py` and `src/storage.py`
   `complete_habit()`.
 - The dashboard calls read-only summary/list methods.
 - SQL code is hidden inside `SQLiteStorage`.
+- `HabitManager.complete_habit()` prevents duplicate completions for the same
+  habit on the same date.
 - This keeps implementation details away from the UI.
 
 ## Persistence
@@ -154,12 +156,14 @@ Location: `tests/`
 
 - `test_habit.py` checks model validation and habit completion logic.
 - `test_storage.py` checks SQLite saving and loading, including reminders.
-- `test_manager.py` checks the app service layer, including reminders.
+- `test_manager.py` checks the app service layer, including reminders and
+  duplicate same-day completion prevention.
 - `test_analytics.py` checks streak, completion-rate, and periodicity
   calculations.
 - `test_bot.py` checks Telegram inline buttons, daily/weekly add controls,
-  command parsing, clear action feedback, compact streak display, organized
-  reminder add/change/delete controls, reset, and the Mini App dashboard link.
+  command parsing, clear action feedback, Mark Done remaining-list behavior,
+  compact streak display, organized reminder add/change/delete controls, reset,
+  and the Mini App dashboard link.
 - `test_cli.py` checks that analytics are reachable from the terminal.
 - `test_fixtures.py` checks the 5-habit, 4-week demo dataset.
 - `test_scheduler.py` checks reminder records become APScheduler jobs and use

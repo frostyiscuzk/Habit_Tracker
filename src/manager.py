@@ -97,8 +97,19 @@ class HabitManager:
     ) -> Completion:
         """Mark a habit complete on a given date, defaulting to today."""
 
-        self.get_habit(habit_id)
-        return self.storage.add_completion(habit_id, completed_on or date.today(), note)
+        habit = self.get_habit(habit_id)
+        completion_date = completed_on or date.today()
+        if self.is_completed_on(habit_id, completion_date):
+            raise ValueError(f"Already completed today: {habit.name}.")
+        return self.storage.add_completion(habit_id, completion_date, note)
+
+    def is_completed_on(self, habit_id: int, completed_on: date) -> bool:
+        """Return whether one habit already has a completion on a date."""
+
+        return any(
+            completion.completed_on == completed_on
+            for completion in self.list_completions(habit_id=habit_id, start=completed_on, end=completed_on)
+        )
 
     def list_completions(
         self,

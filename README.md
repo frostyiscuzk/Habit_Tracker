@@ -34,7 +34,7 @@ python -m pytest
 Expected result:
 
 ```text
-38 passed
+40 passed
 ```
 
 The tests are grouped by project requirement:
@@ -43,9 +43,9 @@ The tests are grouped by project requirement:
 | --- | --- |
 | `tests/test_habit.py` | OOP models, validation, inheritance behavior, daily/weekly completion rules. |
 | `tests/test_storage.py` | SQLite persistence: habits, completions, and reminders are saved and loaded. |
-| `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage and handles reminders. |
+| `tests/test_manager.py` | Composition/service layer: `HabitManager` uses storage, handles reminders, and blocks duplicate same-day completions. |
 | `tests/test_analytics.py` | Functional programming analytics: streak and completion-rate calculations work from input data. |
-| `tests/test_bot.py` | Telegram buttons, daily/weekly add flow, clear action feedback, compact streak display, organized reminder add/change/delete, reset, and Mini App dashboard link. |
+| `tests/test_bot.py` | Telegram buttons, daily/weekly add flow, clear action feedback, Mark Done remaining-list behavior, compact streak display, organized reminder add/change/delete, reset, and Mini App dashboard link. |
 | `tests/test_cli.py` | CLI analytics command exposes the required analytics functions. |
 | `tests/test_fixtures.py` | Demo data includes 5 habits and 4 weeks of completions. |
 | `tests/test_scheduler.py` | APScheduler reminder jobs and timezone behavior. |

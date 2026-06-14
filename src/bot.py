@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
+from datetime import date
 from typing import Final
 
 from .manager import HabitManager
@@ -66,12 +67,19 @@ def action_update_message(title: str, manager: HabitManager | None = None) -> st
 
     manager = manager or HabitManager()
     summary = manager.dashboard_summary()
+    left = habits_left_today(manager)
+    left_text = ", ".join(habit.name for habit in left[:3])
+    if len(left) > 3:
+        left_text = f"{left_text}, +{len(left) - 3} more"
+    if not left_text:
+        left_text = "all done"
     return (
         f"{title}\n\n"
         "┌ Updated\n"
         f"│ Done today: {summary['completed_today']}\n"
         f"│ This week: {summary['completed_this_week']}\n"
-        f"└ Active habits: {summary['active_habits']}"
+        f"│ Left today: {len(left)}\n"
+        f"└ Next: {left_text}"
     )
 
 
@@ -89,6 +97,33 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
             f"{cadence_icon} #{habit.id} {habit.name} "
             f"({habit.periodicity.value}, target {habit.target_count})"
         )
+    return "\n".join(lines)
+
+
+def habits_left_today(manager: HabitManager | None = None):
+    """Return active habits that have not been completed today."""
+
+    manager = manager or HabitManager()
+    today = date.today()
+    return [
+        habit
+        for habit in manager.list_habits()
+        if habit.id is not None and not manager.is_completed_on(habit.id, today)
+    ]
+
+
+def done_menu_message(manager: HabitManager | None = None) -> str:
+    """Build the Mark Done screen with the remaining habits for today."""
+
+    left = habits_left_today(manager)
+    if not left:
+        return "✅ Mark Done\n\n┌ Today\n│ all habits done\n└ Nice work."
+    lines = ["✅ Mark Done", "", "┌ Left today"]
+    for habit in left[:6]:
+        lines.append(f"│ {habit.name}")
+    if len(left) > 6:
+        lines.append(f"│ +{len(left) - 6} more")
+    lines.append("└ Tap one below.")
     return "\n".join(lines)
 
 
@@ -225,7 +260,7 @@ def habit_done_keyboard(manager: HabitManager | None = None):
     manager = manager or HabitManager()
     rows = [
         [InlineKeyboardButton(f"✅ {habit.name}", callback_data=f"{CALLBACK_PREFIX_DONE}{habit.id}")]
-        for habit in manager.list_habits()
+        for habit in habits_left_today(manager)
         if habit.id is not None
     ]
     rows.append([InlineKeyboardButton("⬅️ Back", callback_data=CALLBACK_STATUS)])
@@ -345,7 +380,13 @@ async def done_habit(update, context) -> None:
         habit = manager.get_habit(habit_id)
         manager.complete_habit(habit_id)
     except ValueError as exc:
-        await update.message.reply_text(str(exc), reply_markup=main_menu_keyboard())
+        text = str(exc)
+        reply = (
+            action_update_message(text.replace("Already completed today:", "✅ Already done today:"), manager)
+            if text.startswith("Already completed today:")
+            else text
+        )
+        await update.message.reply_text(reply, reply_markup=main_menu_keyboard())
         return
 
     await update.message.reply_text(
@@ -487,7 +528,7 @@ async def handle_button(update, context) -> None:
             reply_markup=reminder_quick_keyboard(manager, chat_id=query.message.chat.id),
         )
     elif data == CALLBACK_DONE_MENU:
-        await query.edit_message_text("✅ Choose a habit to mark done:", reply_markup=habit_done_keyboard(manager))
+        await query.edit_message_text(done_menu_message(manager), reply_markup=habit_done_keyboard(manager))
     elif data == CALLBACK_SEED:
         manager.seed_demo_data()
         await query.edit_message_text(
@@ -497,7 +538,17 @@ async def handle_button(update, context) -> None:
     elif data and data.startswith(CALLBACK_PREFIX_DONE):
         habit_id = int(data.removeprefix(CALLBACK_PREFIX_DONE))
         habit = manager.get_habit(habit_id)
-        manager.complete_habit(habit_id)
+        try:
+            manager.complete_habit(habit_id)
+        except ValueError as exc:
+            text = str(exc)
+            reply = (
+                action_update_message(text.replace("Already completed today:", "✅ Already done today:"), manager)
+                if text.startswith("Already completed today:")
+                else text
+            )
+            await query.edit_message_text(reply, reply_markup=main_menu_keyboard())
+            return
         await query.edit_message_text(
             action_update_message(f"✅ Done saved: {habit.name}", manager),
             reply_markup=main_menu_keyboard(),

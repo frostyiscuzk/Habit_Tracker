@@ -60,18 +60,19 @@ python -m pytest
 Expected result:
 
 ```text
-38 passed
+40 passed
 ```
 
 What the tests cover:
 
 - `tests/test_habit.py`: OOP, inheritance, validation, daily/weekly logic.
 - `tests/test_storage.py`: SQLite persistence for habits, completions, reminders.
-- `tests/test_manager.py`: composition/service layer, including reminders.
+- `tests/test_manager.py`: composition/service layer, including reminders and
+  duplicate same-day completion prevention.
 - `tests/test_analytics.py`: pure analytics functions, including streaks.
 - `tests/test_bot.py`: Telegram buttons, daily/weekly add flow, clear action
-  feedback, compact streak display, organized reminder add/change/delete,
-  reset, and Mini App link.
+  feedback, Mark Done remaining-list behavior, compact streak display,
+  organized reminder add/change/delete, reset, and Mini App link.
 - `tests/test_cli.py`: terminal analytics command.
 - `tests/test_fixtures.py`: demo data has 5 habits and 4 weeks of history.
 - `tests/test_scheduler.py`: APScheduler jobs and reminder timezone behavior.
