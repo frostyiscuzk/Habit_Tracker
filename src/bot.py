@@ -94,7 +94,7 @@ def habit_list_message(manager: HabitManager | None = None) -> str:
     for habit in habits:
         cadence_icon = "☀️" if habit.periodicity.value == "daily" else "🗓️"
         lines.append(
-            f"{cadence_icon} #{habit.id} {habit.name} "
+            f"{cadence_icon} {habit.name} "
             f"({habit.periodicity.value}, target {habit.target_count})"
         )
     return "\n".join(lines)

@@ -172,6 +172,7 @@ def test_habit_list_message_uses_manager_data(tmp_path) -> None:
 
     assert "Active habits:" in message
     assert "Read" in message
+    assert "#1" not in message
 
 
 def test_done_menu_only_shows_habits_left_today(tmp_path) -> None:
